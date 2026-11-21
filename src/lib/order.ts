@@ -15,12 +15,21 @@ const fromCents = (c: number) => c / 100;
 
 /**
  * SPEC: if current stock is at or below the minimum, order max - current;
- * otherwise order nothing.
+ * otherwise order nothing. Orders are whole units, so this rounds up
+ * (e.g. 2 - 0.5 = 1.5 -> 2).
  */
 export function computeAutoOrder(current: number, min: number, max: number): number {
   const c = cents(current);
   if (c > cents(min)) return 0;
-  return fromCents(Math.max(0, cents(max) - c));
+  return Math.ceil(Math.max(0, cents(max) - c) / 100);
+}
+
+/** Order amounts are whole numbers: "0", "3", "12" -> number; "2.5", "", "-1" -> null. */
+export function parseOrder(raw: string): number | null {
+  const s = raw.trim();
+  if (!/^\d+$/.test(s)) return null;
+  const n = Number(s);
+  return n <= 99999 ? n : null;
 }
 
 /** Current stock after a − / + tap: steps of 0.5, never below 0. */

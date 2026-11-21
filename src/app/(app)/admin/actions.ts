@@ -85,6 +85,7 @@ export async function updateSection(sectionId: string, _prev: FormState, fd: For
   return saved();
 }
 
+/** Only used to reactivate sections deactivated before sections could be deleted. */
 export async function setSectionActive(fd: FormData): Promise<void> {
   const { current } = await requireAdmin();
   const section = await getOwnedSection(current.cafeId, str(fd, "sectionId"));
@@ -104,6 +105,29 @@ export async function moveSection(fd: FormData): Promise<void> {
   if (!order) return;
   await prisma.$transaction(order.map((id, sortOrder) => prisma.section.update({ where: { id }, data: { sortOrder } })));
   refresh();
+}
+
+/**
+ * Permanently deletes a section with its items, their quantity rules and its
+ * extra dates. Refuses if any of its items has been counted in a submission,
+ * so past orders are never silently changed.
+ */
+export async function deleteSection(sectionId: string): Promise<FormState> {
+  const { current } = await requireAdmin();
+  const section = await getOwnedSection(current.cafeId, sectionId);
+  const counted = await prisma.submissionLine.count({ where: { item: { sectionId: section.id } } });
+  if (counted > 0) {
+    return {
+      error: `Items in ${section.name} have been counted before, so deleting it would change past orders. It can't be deleted.`,
+    };
+  }
+  await prisma.$transaction([
+    prisma.quantityRule.deleteMany({ where: { item: { sectionId: section.id } } }),
+    prisma.item.deleteMany({ where: { sectionId: section.id } }),
+    prisma.sectionExtraDate.deleteMany({ where: { sectionId: section.id } }),
+    prisma.section.delete({ where: { id: section.id } }),
+  ]);
+  redirect("/admin");
 }
 
 export async function addExtraDate(sectionId: string, _prev: FormState, fd: FormData): Promise<FormState> {

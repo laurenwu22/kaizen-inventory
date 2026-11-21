@@ -6,7 +6,7 @@
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { submitInventory, type SubmitState } from "@/app/(app)/inventory/actions";
 import type { CountItem, CountSection } from "@/lib/inventory";
-import { computeAutoOrder, parseQty, stepCount } from "@/lib/order";
+import { computeAutoOrder, parseOrder, parseQty, stepCount } from "@/lib/order";
 import { formatQty } from "@/lib/quantity";
 import { formatLaTime } from "@/lib/time";
 import { PendingButton } from "@/components/spinner";
@@ -45,6 +45,21 @@ export function CountForm({ sheet, draftKey }: { sheet: CountSection[]; draftKey
   const [loaded, setLoaded] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [dismissedAt, setDismissedAt] = useState<string | null>(null);
+
+  // Sections fully counted in today's submissions start collapsed. When a new
+  // submit completes more sections, collapse those too (adjusting state while
+  // rendering, as React recommends for reacting to changed props).
+  const submittedKey = sheet
+    .filter((s) => s.submittedToday)
+    .map((s) => s.id)
+    .join(",");
+  const [seenSubmitted, setSeenSubmitted] = useState<string | null>(null);
+  if (submittedKey !== seenSubmitted) {
+    const before = new Set((seenSubmitted ?? "").split(",").filter(Boolean));
+    const newlyDone = submittedKey.split(",").filter((id) => id && !before.has(id));
+    setSeenSubmitted(submittedKey);
+    if (newlyDone.length) setCollapsed((c) => ({ ...c, ...Object.fromEntries(newlyDone.map((id) => [id, true])) }));
+  }
 
   // Restore entries saved on this phone; drop drafts from earlier days.
   useEffect(() => {
@@ -116,7 +131,8 @@ export function CountForm({ sheet, draftKey }: { sheet: CountSection[]; draftKey
   for (const id of visibleIds) {
     const raw = draft.counts[id]?.trim() ?? "";
     if (!raw) {
-      uncounted++;
+      // Items in sections already submitted today aren't "missing".
+      if (!itemsById.get(id)!.section.submittedToday) uncounted++;
       continue;
     }
     const current = parseQty(raw);
@@ -128,7 +144,7 @@ export function CountForm({ sheet, draftKey }: { sheet: CountSection[]; draftKey
     const edited = !!draft.edited[id];
     const auto = computeAutoOrder(current, item.min, item.max);
     const orderRaw = edited ? (draft.orders[id] ?? "") : String(auto);
-    if (edited && parseQty(orderRaw) === null) invalid.push(item.name);
+    if (edited && parseOrder(orderRaw) === null) invalid.push(item.name);
     lines.push({ itemId: id, currentCount: raw, finalOrder: orderRaw, manuallyEdited: edited });
   }
 
@@ -157,9 +173,18 @@ export function CountForm({ sheet, draftKey }: { sheet: CountSection[]; draftKey
                 <span aria-hidden className="h-3.5 w-3.5 shrink-0 rounded-full" style={{ backgroundColor: section.color }} />
                 <span className="min-w-0 flex-1 truncate text-lg font-bold">{section.name}</span>
                 {added && <span className="rounded-full bg-gold/15 px-2 py-0.5 text-xs font-semibold text-[#6b5830]">Added</span>}
-                <span className={`text-sm font-medium ${counted === items.length ? "text-[#4d7a55]" : "text-ink/55"}`}>
-                  {counted}/{items.length}
-                </span>
+                {section.submittedToday && counted === 0 ? (
+                  <span className="flex items-center gap-1 text-sm font-semibold text-[#4d7a55]">
+                    Submitted
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                ) : (
+                  <span className={`text-sm font-medium ${counted === items.length ? "text-[#4d7a55]" : "text-ink/55"}`}>
+                    {counted}/{items.length}
+                  </span>
+                )}
                 <svg
                   width="20"
                   height="20"
@@ -247,7 +272,7 @@ function CountRow({
   const countInvalid = count.trim() !== "" && current === null;
   const auto = current === null ? null : computeAutoOrder(current, item.min, item.max);
   const orderValue = edited ? manualOrder : auto === null ? "" : formatQty(auto);
-  const orderInvalid = edited && parseQty(manualOrder) === null;
+  const orderInvalid = edited && parseOrder(manualOrder) === null;
   const inputBase =
     "h-12 w-full min-w-0 rounded-xl bg-white text-center text-lg font-semibold text-ink ring-1 outline-none focus:ring-2 focus:ring-gold";
 
@@ -307,7 +332,7 @@ function CountRow({
           <input
             id={`order-${item.id}`}
             type="text"
-            inputMode="decimal"
+            inputMode="numeric"
             autoComplete="off"
             placeholder="–"
             disabled={current === null}
@@ -320,6 +345,7 @@ function CountRow({
         </div>
       </div>
       {countInvalid && <p className={ui.error}>Enter a number like 2 or 0.5</p>}
+      {orderInvalid && <p className={ui.error}>To order must be a whole number</p>}
     </li>
   );
 }
@@ -350,7 +376,7 @@ function AddMore({
 
   return (
     <div className="mt-6 flex flex-col gap-3 border-t border-ink/10 pt-6">
-      <h2 className={ui.sectionTitle}>Add to today&apos;s count</h2>
+      <h2 className={ui.sectionTitle}>Add items</h2>
       <div className="relative">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden className="absolute top-1/2 left-3.5 -translate-y-1/2 text-ink/40">
           <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
@@ -392,6 +418,7 @@ function AddMore({
         </ul>
       )}
 
+      {notScheduled.length > 0 && <h2 className={`${ui.sectionTitle} mt-4`}>Add sections</h2>}
       {notScheduled.map((s) => (
         <div key={s.id} className="flex items-center gap-3 rounded-2xl bg-cream/60 p-3 pl-4 ring-1 ring-ink/5">
           <span aria-hidden className="h-3 w-3 shrink-0 rounded-full opacity-60" style={{ backgroundColor: s.color }} />

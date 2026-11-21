@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeAutoOrder, parseQty, stepCount } from "@/lib/order";
+import { computeAutoOrder, parseOrder, parseQty, stepCount } from "@/lib/order";
 import { buildCountSheet, type SectionInput } from "@/lib/inventory";
 
 describe("computeAutoOrder (SPEC: at or below min -> max - current, else 0)", () => {
@@ -13,10 +13,12 @@ describe("computeAutoOrder (SPEC: at or below min -> max - current, else 0)", ()
     expect(computeAutoOrder(2.5, 2, 4)).toBe(0);
     expect(computeAutoOrder(10, 2, 4)).toBe(0);
   });
-  it("handles zero stock and decimals without float errors", () => {
+  it("rounds partial amounts up to a whole number", () => {
     expect(computeAutoOrder(0, 2, 4)).toBe(4);
-    expect(computeAutoOrder(0.5, 0.5, 2)).toBe(1.5);
-    expect(computeAutoOrder(0.1, 0.3, 0.3)).toBe(0.2);
+    expect(computeAutoOrder(0.5, 0.5, 2)).toBe(2); // 1.5 -> 2
+    expect(computeAutoOrder(1.5, 2, 4)).toBe(3); // 2.5 -> 3
+    expect(computeAutoOrder(0.1, 0.3, 0.3)).toBe(1); // 0.2 -> 1
+    expect(computeAutoOrder(2, 2, 2)).toBe(0); // exactly at max
   });
   it("never goes negative even if min > max slipped through", () => {
     expect(computeAutoOrder(3, 5, 2)).toBe(0);
@@ -32,6 +34,16 @@ describe("parseQty", () => {
   });
   it("rejects blanks, negatives, too many decimals and text", () => {
     for (const bad of ["", "-1", "1.234", "abc", "1e3"]) expect(parseQty(bad), bad).toBeNull();
+  });
+});
+
+describe("parseOrder (whole numbers only)", () => {
+  it("accepts whole numbers", () => {
+    expect(parseOrder("0")).toBe(0);
+    expect(parseOrder(" 12 ")).toBe(12);
+  });
+  it("rejects halves, blanks, negatives and text", () => {
+    for (const bad of ["2.5", "0.5", "", "-1", "abc", "2."]) expect(parseOrder(bad), bad).toBeNull();
   });
 });
 
@@ -80,5 +92,13 @@ describe("buildCountSheet", () => {
     expect(tue.find((s) => s.id === "milk")!.items[0]).toMatchObject({ min: 10, max: 30 });
     const thuExtra = buildCountSheet(base, "2026-11-26");
     expect(thuExtra.find((s) => s.id === "per")!.scheduled).toBe(true);
+  });
+
+  it("marks a section submitted only when every item was counted today", () => {
+    const partial = buildCountSheet(base, "2026-11-20", new Set(["whole"]));
+    expect(partial.find((s) => s.id === "milk")!.submittedToday).toBe(false);
+    const full = buildCountSheet(base, "2026-11-20", new Set(["whole", "oat", "ban"]));
+    expect(full.map((s) => [s.id, s.submittedToday])).toEqual([["per", true], ["milk", true]]);
+    expect(buildCountSheet(base, "2026-11-20").every((s) => !s.submittedToday)).toBe(true);
   });
 });

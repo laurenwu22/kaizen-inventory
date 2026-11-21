@@ -120,18 +120,23 @@ describe("submitInventory", () => {
     expect([Number(b.currentCount), Number(b.autoOrder), Number(b.finalOrder), b.manuallyEdited]).toEqual([3, 3, 3, false]);
   });
 
+  it("rounds the automatic order up to a whole number", async () => {
+    const r = await submit([line(ids.milk, "0.5")]); // milk 0.5-2: 2 - 0.5 = 1.5 -> 2
+    expect(r.result?.submitted?.toOrder[0]).toMatchObject({ item: "Milk", order: 2 });
+  });
+
   it("ignores a tampered order amount unless it's marked as manually edited", async () => {
     const r = await submit([line(ids.bananas, "1", { finalOrder: "99" })]);
     expect(r.result?.submitted?.toOrder[0].order).toBe(5); // 6 - 1
   });
 
   it("keeps a manual edit and records it", async () => {
-    await submit([line(ids.bananas, "1", { finalOrder: "2.5", manuallyEdited: true })]);
+    await submit([line(ids.bananas, "1", { finalOrder: "2", manuallyEdited: true })]);
     const l = await prisma.submissionLine.findFirstOrThrow({
       where: { itemId: ids.bananas },
       orderBy: { submission: { submittedAt: "desc" } },
     });
-    expect([Number(l.autoOrder), Number(l.finalOrder), l.manuallyEdited]).toEqual([5, 2.5, true]);
+    expect([Number(l.autoOrder), Number(l.finalOrder), l.manuallyEdited]).toEqual([5, 2, true]);
   });
 
   it("an edit that matches the automatic amount isn't flagged as manual", async () => {
@@ -150,7 +155,8 @@ describe("submitInventory", () => {
       ["not json", /couldn't be read/],
       [[line(ids.bananas, "-1")], /Check the count/],
       [[line(ids.bananas, "1.234")], /Check the count/],
-      [[line(ids.bananas, "1", { finalOrder: "abc", manuallyEdited: true })], /order amount/],
+      [[line(ids.bananas, "1", { finalOrder: "abc", manuallyEdited: true })], /whole number/],
+      [[line(ids.bananas, "1", { finalOrder: "2.5", manuallyEdited: true })], /whole number/],
       [[line(ids.bananas, "1"), line(ids.bananas, "2")], /twice/],
       [[line(ids.itemB, "1")], /changed since/], // another cafe's item
       [[line(ids.offItem, "1")], /changed since/], // inactive section

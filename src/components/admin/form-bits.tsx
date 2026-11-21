@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useFormStatus } from "react-dom";
 import { SECTION_COLORS, type FormState } from "@/lib/admin/validation";
 import { WEEK_ORDER, WEEKDAY_SHORT } from "@/lib/quantity";
 import { ui } from "@/components/ui";
-import { PendingButton, Spinner } from "@/components/spinner";
+import { PendingButton } from "@/components/spinner";
 
 export function FieldError({ state, name }: { state: FormState; name: string }) {
   const msg = state.fieldErrors?.[name];
@@ -123,40 +122,5 @@ export function ColorPicker({ defaultValue }: { defaultValue?: string }) {
         </label>
       ))}
     </div>
-  );
-}
-
-/** A button that needs a second tap to confirm (for deactivating). */
-export function ConfirmSubmit({
-  label,
-  confirmLabel,
-  className,
-}: {
-  label: string;
-  confirmLabel: string;
-  className: string;
-}) {
-  const [armed, setArmed] = useState(false);
-  const { pending } = useFormStatus();
-  if (!armed) {
-    return (
-      <button type="button" className={className} onClick={() => setArmed(true)}>
-        {label}
-      </button>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-2">
-      <button
-        type="submit"
-        disabled={pending}
-        className="inline-flex h-11 items-center justify-center rounded-full bg-red-700 px-4 text-sm font-semibold text-white active:bg-red-800 disabled:opacity-40"
-      >
-        {pending ? <Spinner /> : confirmLabel}
-      </button>
-      <button type="button" className="h-11 px-3 text-sm text-ink/60" onClick={() => setArmed(false)}>
-        Cancel
-      </button>
-    </span>
   );
 }

@@ -11,7 +11,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth/dal";
 import { toRule } from "@/lib/admin/data";
-import { computeAutoOrder, parseQty } from "@/lib/order";
+import { computeAutoOrder, parseOrder, parseQty } from "@/lib/order";
 import { byPosition, resolveQuantity } from "@/lib/quantity";
 import { dateOnly, laDateString } from "@/lib/time";
 
@@ -68,8 +68,8 @@ export async function submitInventory(_prev: SubmitState, fd: FormData): Promise
     const autoOrder = computeAutoOrder(current, q.min, q.max);
     let finalOrder = autoOrder;
     if (l.manuallyEdited) {
-      const edited = parseQty(l.finalOrder);
-      if (edited === null) return { error: `Check the order amount for ${item.name}.` };
+      const edited = parseOrder(l.finalOrder);
+      if (edited === null) return { error: `The order amount for ${item.name} must be a whole number.` };
       finalOrder = edited;
     }
     lines.push({ itemId: item.id, currentCount: current, autoOrder, finalOrder, manuallyEdited: finalOrder !== autoOrder });

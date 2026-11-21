@@ -285,10 +285,40 @@ describe("admin at cafe A", () => {
     await prisma.submission.delete({ where: { id: submission.id } });
   });
 
+  it("delete section removes it with its items, rules and extra dates", async () => {
+    await run(() => actions.createSection({}, fd({ name: "Temp section", color: "#6b8f71", days: ["1"] })));
+    const temp = await prisma.section.findFirstOrThrow({ where: { cafeId: ids.cafeA, name: "Temp section" } });
+    await run(() => actions.createItem(temp.id, {}, itemFd({ name: "Temp item", weekdays: [{ day: 2, min: "1", max: "1" }] })));
+    await run(() => actions.addExtraDate(temp.id, {}, fd({ date: "2027-02-13" })));
+    const tempItem = await prisma.item.findFirstOrThrow({ where: { sectionId: temp.id } });
+    const r = await run(() => actions.deleteSection(temp.id));
+    expect(r.redirect).toBe("/admin");
+    expect(await prisma.section.findUnique({ where: { id: temp.id } })).toBeNull();
+    expect(await prisma.item.count({ where: { sectionId: temp.id } })).toBe(0);
+    expect(await prisma.quantityRule.count({ where: { itemId: tempItem.id } })).toBe(0);
+    expect(await prisma.sectionExtraDate.count({ where: { sectionId: temp.id } })).toBe(0);
+  });
+
+  it("delete section refuses a section whose items have been counted", async () => {
+    const submission = await prisma.submission.create({
+      data: {
+        cafeId: ids.cafeA,
+        userId: ids.adminA,
+        businessDate: new Date("2026-11-20T00:00:00Z"),
+        lines: { create: { itemId, currentCount: 1, autoOrder: 3, finalOrder: 3 } },
+      },
+    });
+    const r = await run(() => actions.deleteSection(sectionId));
+    expect(r.result?.error).toMatch(/counted before/);
+    expect(await prisma.section.findUnique({ where: { id: sectionId } })).not.toBeNull();
+    await prisma.submission.delete({ where: { id: submission.id } });
+  });
+
   it("cannot touch cafe B's sections or items by id", async () => {
     const attempts: Array<() => Promise<unknown>> = [
       () => actions.updateSection(ids.sectionB, {}, fd({ name: "Hacked", color: "#6b8f71" })),
       () => actions.setSectionActive(fd({ sectionId: ids.sectionB, active: "false" })),
+      () => actions.deleteSection(ids.sectionB),
       () => actions.createItem(ids.sectionB, {}, fd({ name: "X", unit: "box", min: "1", max: "2", weekdays: "[]", dates: "[]" })),
       () => actions.updateItem(ids.itemB, {}, fd({ name: "Hacked", unit: "box", min: "1", max: "2", weekdays: "[]", dates: "[]" })),
       () => actions.deleteItem(ids.itemB),
@@ -313,6 +343,7 @@ describe("non-admins", () => {
       () => actions.createSection({}, fd({ name: "Sneaky", color: "#6b8f71" })),
       () => actions.updateSection(section.id, {}, fd({ name: "Sneaky", color: "#6b8f71" })),
       () => actions.setSectionActive(fd({ sectionId: section.id, active: "false" })),
+      () => actions.deleteSection(section.id),
       () => actions.createItem(section.id, {}, fd({ name: "X", unit: "box", min: "1", max: "2", weekdays: "[]", dates: "[]" })),
     ];
     for (const attempt of attempts) expect((await run(attempt)).redirect).toBe("/inventory");

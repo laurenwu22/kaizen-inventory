@@ -76,7 +76,7 @@ async function SectionsAdmin() {
       {inactive.length > 0 && (
         <details className="mt-8">
           <summary className="cursor-pointer py-2 font-semibold text-ink/60">
-            Inactive sections ({inactive.length})
+            Inactive sections ({inactive.length}) · reactivate or open to delete
           </summary>
           <ul className="mt-2 flex flex-col gap-2">
             {inactive.map((s) => (

@@ -94,7 +94,7 @@ MILK
 
 **Sections**
 
-* Create, edit, deactivate sections.  
+* Create, edit, reorder, and delete sections. Deleting a section permanently removes it with its items and their quantity rules; a section with items that have already been counted can't be deleted.  
 * Set **days of the week needed** (any combination) and **additional one-time dates**.
 
 **Items**

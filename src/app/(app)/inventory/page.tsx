@@ -14,7 +14,7 @@ async function InventoryHome() {
   const cafeId = session.current.cafeId;
   const today = laDateString();
 
-  const [sections, last] = await Promise.all([
+  const [sections, last, countedLines] = await Promise.all([
     prisma.section.findMany({
       where: { cafeId, active: true },
       include: {
@@ -27,6 +27,12 @@ async function InventoryHome() {
       orderBy: { submittedAt: "desc" },
       select: { submittedAt: true, user: { select: { firstName: true } } },
     }),
+    // Items counted in any of today's submissions at this cafe.
+    prisma.submissionLine.findMany({
+      where: { submission: { cafeId, businessDate: dateOnly(today) } },
+      distinct: ["itemId"],
+      select: { itemId: true },
+    }),
   ]);
 
   const sheet = buildCountSheet(
@@ -36,6 +42,7 @@ async function InventoryHome() {
       items: s.items.map((i) => ({ ...i, rules: i.rules.map(toRule) })),
     })),
     today,
+    new Set(countedLines.map((l) => l.itemId)),
   );
 
   return (

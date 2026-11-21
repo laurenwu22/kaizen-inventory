@@ -17,6 +17,8 @@ export type CountSection = {
   color: string;
   /** Scheduled for this date (weekday or extra date). Others can be added on the fly. */
   scheduled: boolean;
+  /** Every item in the section has been counted in a submission today. */
+  submittedToday: boolean;
   items: CountItem[];
 };
 
@@ -36,7 +38,11 @@ export type SectionInput = {
  * today's min/max. Items without any applicable amounts and sections with no
  * countable items are left out.
  */
-export function buildCountSheet(sections: SectionInput[], ymd: string): CountSection[] {
+export function buildCountSheet(
+  sections: SectionInput[],
+  ymd: string,
+  countedToday: ReadonlySet<string> = new Set(),
+): CountSection[] {
   return sections
     .filter((s) => s.active)
     .sort(byPosition)
@@ -45,6 +51,7 @@ export function buildCountSheet(sections: SectionInput[], ymd: string): CountSec
       name: s.name,
       color: s.color,
       scheduled: isSectionScheduled(s, ymd),
+      submittedToday: false,
       items: s.items
         .filter((i) => i.active)
         .sort(byPosition)
@@ -53,5 +60,6 @@ export function buildCountSheet(sections: SectionInput[], ymd: string): CountSec
           return q ? [{ id: i.id, name: i.name, unit: i.unit, min: q.min, max: q.max }] : [];
         }),
     }))
-    .filter((s) => s.items.length > 0);
+    .filter((s) => s.items.length > 0)
+    .map((s) => ({ ...s, submittedToday: s.items.every((i) => countedToday.has(i.id)) }));
 }

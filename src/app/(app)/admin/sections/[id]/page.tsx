@@ -7,11 +7,19 @@ import { cafeUnits, getOwnedSection, toRule } from "@/lib/admin/data";
 import { byPosition, formatQty, WEEKDAY_SHORT } from "@/lib/quantity";
 import { dateOnlyString, formatYmd, laDateString } from "@/lib/time";
 import { BackLink, Card, ColorDot, PageTitle } from "@/components/admin/admin-chrome";
-import { ConfirmSubmit } from "@/components/admin/form-bits";
+import { DeleteButton } from "@/components/admin/delete-button";
 import { ExtraDateForm, SectionForm } from "@/components/admin/forms";
 import { ui } from "@/components/ui";
 import { AddItemModal } from "@/components/admin/add-item-modal";
-import { addExtraDate, createItem, moveItem, removeExtraDate, setSectionActive, updateSection } from "../../actions";
+import {
+  addExtraDate,
+  createItem,
+  deleteSection,
+  moveItem,
+  removeExtraDate,
+  setSectionActive,
+  updateSection,
+} from "../../actions";
 
 async function SectionAdmin({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireAdmin();
@@ -138,20 +146,14 @@ async function SectionAdmin({ params }: { params: Promise<{ id: string }> }) {
           <ExtraDateForm action={addExtraDate.bind(null, section.id)} minDate={today} />
         </Card>
 
-        <form action={setSectionActive} className="pt-2">
-          <input type="hidden" name="sectionId" value={section.id} />
-          <input type="hidden" name="active" value={section.active ? "false" : "true"} />
-          {section.active ? (
-            <>
-              <ConfirmSubmit label="Deactivate section" confirmLabel="Yes, deactivate" className={ui.secondary} />
-              <p className="mt-2 text-sm text-ink/55">
-                Hides it from employees. Items, rules and history are kept, and you can reactivate it anytime.
-              </p>
-            </>
-          ) : (
+        {!section.active && (
+          <form action={setSectionActive} className="flex justify-center">
+            <input type="hidden" name="sectionId" value={section.id} />
+            <input type="hidden" name="active" value="true" />
             <PendingButton className={ui.primary}>Reactivate section</PendingButton>
-          )}
-        </form>
+          </form>
+        )}
+        <DeleteButton action={deleteSection.bind(null, section.id)} name={section.name} label="Delete section" />
       </div>
     </>
   );

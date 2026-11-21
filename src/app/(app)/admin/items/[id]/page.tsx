@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 import { formatQty } from "@/lib/quantity";
 import { laDateString } from "@/lib/time";
 import { BackLink, Card, ColorDot, PageTitle } from "@/components/admin/admin-chrome";
-import { DeleteItemButton } from "@/components/admin/delete-item-button";
+import { DeleteButton } from "@/components/admin/delete-button";
 import { ItemEditor } from "@/components/admin/item-editor";
 import { deleteItem, updateItem } from "../../actions";
 
@@ -56,7 +56,7 @@ async function ItemAdmin({ params }: { params: Promise<{ id: string }> }) {
             }}
           />
         </Card>
-        <DeleteItemButton action={deleteItem.bind(null, item.id)} itemName={item.name} />
+        <DeleteButton action={deleteItem.bind(null, item.id)} name={item.name} label="Delete item" />
       </div>
     </>
   );
