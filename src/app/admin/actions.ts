@@ -11,16 +11,15 @@ import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/dal";
 import { getOwnedItem, getOwnedSection } from "@/lib/admin/data";
 import {
-  dateRuleSchema,
   extraDateSchema,
-  itemSchema,
   parseForm,
+  parseItemForm,
   sectionSchema,
-  weekdayRuleSchema,
   saved,
   type FormState,
+  type ItemInput,
 } from "@/lib/admin/validation";
-import { dateOnly } from "@/lib/time";
+import { dateOnly, laDateString } from "@/lib/time";
 import { Prisma, RuleType } from "@/generated/prisma/client";
 
 const str = (fd: FormData, key: string) => String(fd.get(key) ?? "");
@@ -130,55 +129,73 @@ export async function removeExtraDate(fd: FormData): Promise<void> {
 
 // ------------------------------------------------------------------- Items
 
-export async function createItem(sectionId: string, _prev: FormState, fd: FormData): Promise<FormState> {
-  const { current } = await requireAdmin();
-  await getOwnedSection(current.cafeId, sectionId);
-  const parsed = parseForm(itemSchema, {
+function itemFormFields(fd: FormData) {
+  return {
     name: str(fd, "name"),
     unit: str(fd, "unit"),
     min: str(fd, "min"),
     max: str(fd, "max"),
-  });
-  if (!parsed.data) return parsed.state;
-  const { name, unit, min, max } = parsed.data;
+    weekdays: str(fd, "weekdays"),
+    dates: str(fd, "dates"),
+  };
+}
 
-  let id: string;
+/** Rule rows for an item's default, custom weekday amounts and one-time dates. */
+function ruleRows(itemId: string, data: ItemInput) {
+  return [
+    { itemId, type: RuleType.DEFAULT, min: data.min, max: data.max },
+    ...data.weekdays.map((w) => ({ itemId, type: RuleType.WEEKDAY, weekday: w.day, min: w.min, max: w.max })),
+    ...data.dates.map((d) => ({ itemId, type: RuleType.DATE, date: dateOnly(d.date), min: d.min, max: d.max })),
+  ];
+}
+
+/** Creates an item with its default (required), custom daily amounts and one-time dates. */
+export async function createItem(sectionId: string, _prev: FormState, fd: FormData): Promise<FormState> {
+  const { current } = await requireAdmin();
+  await getOwnedSection(current.cafeId, sectionId);
+  const parsed = parseItemForm(itemFormFields(fd), laDateString());
+  if (!parsed.data) return parsed.state;
+  const data = parsed.data;
+
   try {
-    const last = await prisma.item.aggregate({ where: { sectionId }, _max: { sortOrder: true } });
-    // An item is never saved without its default min/max.
-    const item = await prisma.item.create({
-      data: {
-        sectionId,
-        name,
-        unit,
-        sortOrder: (last._max.sortOrder ?? -1) + 1,
-        rules: { create: { type: RuleType.DEFAULT, min, max } },
-      },
+    await prisma.$transaction(async (tx) => {
+      const item = await tx.item.create({ data: { sectionId, name: data.name, unit: data.unit } });
+      await tx.quantityRule.createMany({ data: ruleRows(item.id, data) });
     });
-    id = item.id;
   } catch (e) {
     if (isUniqueViolation(e)) return { fieldErrors: { name: "This section already has an item with this name" } };
     throw e;
   }
-  redirect(`/admin/items/${id}`);
+  refresh();
+  return saved();
 }
 
+/**
+ * Saves the whole item editor. The default, custom weekday amounts and upcoming
+ * one-time dates are replaced with what was submitted; past one-time dates are
+ * kept for history.
+ */
 export async function updateItem(itemId: string, _prev: FormState, fd: FormData): Promise<FormState> {
   const { current } = await requireAdmin();
   const item = await getOwnedItem(current.cafeId, itemId);
-  const parsed = parseForm(itemSchema, {
-    name: str(fd, "name"),
-    unit: str(fd, "unit"),
-    min: str(fd, "min"),
-    max: str(fd, "max"),
-  });
+  const today = laDateString();
+  const parsed = parseItemForm(itemFormFields(fd), today);
   if (!parsed.data) return parsed.state;
-  const { name, unit, min, max } = parsed.data;
+  const data = parsed.data;
+
   try {
     await prisma.$transaction([
-      prisma.item.update({ where: { id: item.id }, data: { name, unit } }),
-      prisma.quantityRule.deleteMany({ where: { itemId: item.id, type: RuleType.DEFAULT } }),
-      prisma.quantityRule.create({ data: { itemId: item.id, type: RuleType.DEFAULT, min, max } }),
+      prisma.item.update({ where: { id: item.id }, data: { name: data.name, unit: data.unit } }),
+      prisma.quantityRule.deleteMany({
+        where: {
+          itemId: item.id,
+          OR: [
+            { type: { in: [RuleType.DEFAULT, RuleType.WEEKDAY] } },
+            { type: RuleType.DATE, date: { gte: dateOnly(today) } },
+          ],
+        },
+      }),
+      prisma.quantityRule.createMany({ data: ruleRows(item.id, data) }),
     ]);
   } catch (e) {
     if (isUniqueViolation(e)) return { fieldErrors: { name: "This section already has an item with this name" } };
@@ -188,78 +205,22 @@ export async function updateItem(itemId: string, _prev: FormState, fd: FormData)
   return saved();
 }
 
-export async function setItemActive(fd: FormData): Promise<void> {
-  const { current } = await requireAdmin();
-  const item = await getOwnedItem(current.cafeId, str(fd, "itemId"));
-  // Rules are kept when an item is deactivated; only the flag changes.
-  await prisma.item.update({ where: { id: item.id }, data: { active: str(fd, "active") === "true" } });
-  refresh();
-}
-
-export async function moveItem(fd: FormData): Promise<void> {
-  const { current } = await requireAdmin();
-  const item = await getOwnedItem(current.cafeId, str(fd, "itemId"));
-  const siblings = await prisma.item.findMany({
-    where: { sectionId: item.sectionId, active: item.active },
-    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-    select: { id: true },
-  });
-  const order = reorder(siblings.map((s) => s.id), item.id, str(fd, "direction") === "up" ? "up" : "down");
-  if (!order) return;
-  await prisma.$transaction(order.map((id, sortOrder) => prisma.item.update({ where: { id }, data: { sortOrder } })));
-  refresh();
-}
-
-// ------------------------------------------------------------------- Rules
-
-/** Sets the same min/max for each selected weekday (one rule row per day). */
-export async function setWeekdayRules(itemId: string, _prev: FormState, fd: FormData): Promise<FormState> {
+/**
+ * Permanently deletes an item and its quantity rules. Refuses if the item has
+ * been counted in a submission, so past orders are never silently changed.
+ */
+export async function deleteItem(itemId: string): Promise<FormState> {
   const { current } = await requireAdmin();
   const item = await getOwnedItem(current.cafeId, itemId);
-  const parsed = parseForm(weekdayRuleSchema, { days: days(fd), min: str(fd, "min"), max: str(fd, "max") });
-  if (!parsed.data) return parsed.state;
-  const { days: weekdays, min, max } = parsed.data;
+  const counted = await prisma.submissionLine.count({ where: { itemId: item.id } });
+  if (counted > 0) {
+    return {
+      error: `${item.name} has been counted before, so deleting it would change past orders. It can't be deleted.`,
+    };
+  }
   await prisma.$transaction([
-    prisma.quantityRule.deleteMany({ where: { itemId: item.id, type: RuleType.WEEKDAY, weekday: { in: weekdays } } }),
-    prisma.quantityRule.createMany({
-      data: weekdays.map((weekday) => ({ itemId: item.id, type: RuleType.WEEKDAY, weekday, min, max })),
-    }),
+    prisma.quantityRule.deleteMany({ where: { itemId: item.id } }),
+    prisma.item.delete({ where: { id: item.id } }),
   ]);
-  refresh();
-  return saved();
-}
-
-/** Removes a weekday override so that day goes back to the default. */
-export async function clearWeekdayRule(fd: FormData): Promise<void> {
-  const { current } = await requireAdmin();
-  const item = await getOwnedItem(current.cafeId, str(fd, "itemId"));
-  const weekday = Number(str(fd, "weekday"));
-  if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) return;
-  await prisma.quantityRule.deleteMany({ where: { itemId: item.id, type: RuleType.WEEKDAY, weekday } });
-  refresh();
-}
-
-export async function setDateRule(itemId: string, _prev: FormState, fd: FormData): Promise<FormState> {
-  const { current } = await requireAdmin();
-  const item = await getOwnedItem(current.cafeId, itemId);
-  const parsed = parseForm(dateRuleSchema, { date: str(fd, "date"), min: str(fd, "min"), max: str(fd, "max") });
-  if (!parsed.data) return parsed.state;
-  const date = dateOnly(parsed.data.date);
-  await prisma.$transaction([
-    prisma.quantityRule.deleteMany({ where: { itemId: item.id, type: RuleType.DATE, date } }),
-    prisma.quantityRule.create({
-      data: { itemId: item.id, type: RuleType.DATE, date, min: parsed.data.min, max: parsed.data.max },
-    }),
-  ]);
-  refresh();
-  return saved();
-}
-
-export async function removeDateRule(fd: FormData): Promise<void> {
-  const { current } = await requireAdmin();
-  const item = await getOwnedItem(current.cafeId, str(fd, "itemId"));
-  await prisma.quantityRule.deleteMany({
-    where: { id: str(fd, "ruleId"), itemId: item.id, type: RuleType.DATE },
-  });
-  refresh();
+  redirect(`/admin/sections/${item.sectionId}`);
 }

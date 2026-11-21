@@ -62,12 +62,6 @@ export const itemSchema = z
   })
   .and(minMax);
 
-export const weekdayRuleSchema = z
-  .object({ days: z.array(weekday).min(1, "Pick at least one day").transform((d) => [...new Set(d)]) })
-  .and(minMax);
-
-export const dateRuleSchema = z.object({ date: ymd }).and(minMax);
-
 export const extraDateSchema = z.object({ date: ymd });
 
 export type FieldErrors = Partial<Record<string, string>>;
@@ -94,4 +88,96 @@ export function parseForm<T>(
     fieldErrors[key] ??= issue.message;
   }
   return { state: { fieldErrors } };
+}
+
+const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+export type AmountInput = { min: string; max: string };
+export type WeekdayAmount = { day: number; min: number; max: number };
+export type DateAmount = { date: string; min: number; max: number };
+export type ItemInput = {
+  name: string;
+  unit: string;
+  min: number;
+  max: number;
+  weekdays: WeekdayAmount[];
+  dates: DateAmount[];
+};
+
+const weekdayEntry = z.object({ day: z.number().int().min(0).max(6), min: z.string(), max: z.string() });
+const dateEntry = z.object({ date: z.string(), min: z.string(), max: z.string() });
+
+function parseJsonArray<T>(raw: string, schema: z.ZodType<T>): T[] | null {
+  try {
+    const value = raw ? JSON.parse(raw) : [];
+    const result = z.array(schema).safeParse(value);
+    return result.success ? result.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Validates the whole item editor: details, default amounts, custom weekday
+ * amounts and one-time dates (sent as JSON in "weekdays" and "dates").
+ * One-time dates must be today or later (LA date passed in as `today`).
+ */
+export function parseItemForm(
+  raw: { name: string; unit: string; min: string; max: string; weekdays: string; dates: string },
+  today: string,
+): { data: ItemInput; state?: undefined } | { data?: undefined; state: FormState } {
+  const fieldErrors: FieldErrors = {};
+  const base = parseForm(itemSchema, { name: raw.name, unit: raw.unit, min: raw.min, max: raw.max });
+  if (base.state) Object.assign(fieldErrors, base.state.fieldErrors);
+
+  const weekdays: WeekdayAmount[] = [];
+  const weekdayRows = parseJsonArray(raw.weekdays, weekdayEntry);
+  if (!weekdayRows) fieldErrors.weekdays = "Custom daily amounts couldn't be read. Try again.";
+  for (const row of weekdayRows ?? []) {
+    const label = WEEKDAY_NAMES[row.day];
+    if (weekdays.some((w) => w.day === row.day)) {
+      fieldErrors.weekdays ??= `${label} is listed twice`;
+      continue;
+    }
+    const amounts = minMax.safeParse({ min: row.min, max: row.max });
+    if (!amounts.success) {
+      fieldErrors.weekdays ??= `${label}: ${amounts.error.issues[0].message}`;
+      continue;
+    }
+    weekdays.push({ day: row.day, ...amounts.data });
+  }
+
+  const dates: DateAmount[] = [];
+  const dateRows = parseJsonArray(raw.dates, dateEntry);
+  if (!dateRows) fieldErrors.dates = "One-time dates couldn't be read. Try again.";
+  for (const row of dateRows ?? []) {
+    const date = ymd.safeParse(row.date);
+    if (!date.success) {
+      fieldErrors.dates ??= date.error.issues[0].message;
+      continue;
+    }
+    if (date.data < today) {
+      fieldErrors.dates ??= `${date.data} is in the past`;
+      continue;
+    }
+    if (dates.some((d) => d.date === date.data)) {
+      fieldErrors.dates ??= `${date.data} is listed twice`;
+      continue;
+    }
+    const amounts = minMax.safeParse({ min: row.min, max: row.max });
+    if (!amounts.success) {
+      fieldErrors.dates ??= `${date.data}: ${amounts.error.issues[0].message}`;
+      continue;
+    }
+    dates.push({ date: date.data, ...amounts.data });
+  }
+
+  if (Object.keys(fieldErrors).length > 0 || !base.data) return { state: { fieldErrors } };
+  return { data: { ...base.data, weekdays, dates } };
+}
+
+/** Client-side check for a min/max pair before applying it locally. */
+export function checkAmounts(a: AmountInput): string | null {
+  const r = minMax.safeParse(a);
+  return r.success ? null : r.error.issues[0].message;
 }

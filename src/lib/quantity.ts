@@ -55,6 +55,11 @@ export const WEEKDAY_LONG = [
   "Saturday",
 ] as const;
 
+/** Alphabetical, ignoring case, with numbers in natural order ("Cup 2" before "Cup 10"). */
+export function compareNames(a: string, b: string): number {
+  return a.localeCompare(b, "en", { sensitivity: "base", numeric: true });
+}
+
 /** 2 -> "2", 0.5 -> "0.5", 2.25 -> "2.25". */
 export function formatQty(n: number): string {
   return Number.isInteger(n) ? String(n) : String(Number(n.toFixed(2)));

@@ -79,3 +79,16 @@ describe("formatting", () => {
     expect(describeDays([])).toBe("No regular days");
   });
 });
+
+describe("compareNames", () => {
+  it("sorts alphabetically ignoring case, numbers naturally", async () => {
+    const { compareNames } = await import("@/lib/quantity");
+    expect(["mint", "Bananas", "cup 10", "Cup 2", "almond"].sort(compareNames)).toEqual([
+      "almond",
+      "Bananas",
+      "Cup 2",
+      "cup 10",
+      "mint",
+    ]);
+  });
+});

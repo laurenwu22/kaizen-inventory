@@ -96,7 +96,8 @@ MILK
 
 **Items**
 
-* Create, edit, deactivate items within a section. Fields: name, unit (a single fixed label, for example *bunch*), and quantities.  
+* Create, edit, and delete items within a section. Fields: name, unit (a single fixed label, for example *bunch*), and quantities. Items are listed alphabetically.  
+* Deleting an item permanently removes it and its quantity rules. An item that has already been counted in a submission can't be deleted, so past orders stay intact.  
 * **Every new item must have a default min and max** before it can be saved.  
 * Add optional **weekday rules** and **one-time date rules** (see section 7).
 

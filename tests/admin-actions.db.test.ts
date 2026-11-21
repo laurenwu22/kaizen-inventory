@@ -85,6 +85,7 @@ beforeAll(async () => {
 afterAll(async () => {
   const cafeIds = [ids.cafeA, ids.cafeB].filter(Boolean);
   const where = { item: { section: { cafeId: { in: cafeIds } } } };
+  await prisma.submission.deleteMany({ where: { cafeId: { in: cafeIds } } });
   await prisma.quantityRule.deleteMany({ where });
   await prisma.item.deleteMany({ where: { section: { cafeId: { in: cafeIds } } } });
   await prisma.sectionExtraDate.deleteMany({ where: { section: { cafeId: { in: cafeIds } } } });
@@ -138,82 +139,141 @@ describe("admin at cafe A", () => {
     expect(await prisma.sectionExtraDate.count({ where: { sectionId } })).toBe(0);
   });
 
+  /** Form data for the item editor. */
+  const itemFd = (
+    over: Partial<Record<"name" | "unit" | "min" | "max", string>> & {
+      weekdays?: { day: number; min: string; max: string }[];
+      dates?: { date: string; min: string; max: string }[];
+    } = {},
+  ) =>
+    fd({
+      name: over.name ?? "Bananas",
+      unit: over.unit ?? "bunch",
+      min: over.min ?? "2",
+      max: over.max ?? "4",
+      weekdays: JSON.stringify(over.weekdays ?? []),
+      dates: JSON.stringify(over.dates ?? []),
+    });
+
   it("won't create an item without valid default min/max", async () => {
-    let r = await run(() => actions.createItem(sectionId, {}, fd({ name: "Bananas", unit: "bunch", min: "", max: "4" })));
+    let r = await run(() => actions.createItem(sectionId, {}, itemFd({ min: "" })));
     expect(r.result?.fieldErrors?.min).toBeTruthy();
-    r = await run(() => actions.createItem(sectionId, {}, fd({ name: "Bananas", unit: "bunch", min: "5", max: "4" })));
+    r = await run(() => actions.createItem(sectionId, {}, itemFd({ min: "5", max: "4" })));
     expect(r.result?.fieldErrors?.max).toMatch(/more than max/);
     for (const bad of ["-1", "1.234", "abc"]) {
-      r = await run(() => actions.createItem(sectionId, {}, fd({ name: "Bananas", unit: "bunch", min: bad, max: "4" })));
+      r = await run(() => actions.createItem(sectionId, {}, itemFd({ min: bad })));
       expect(r.result?.fieldErrors?.min, bad).toBeTruthy();
     }
     expect(await prisma.item.count({ where: { sectionId } })).toBe(0);
   });
 
-  it("creates an item with its default rule (decimals allowed)", async () => {
-    const r = await run(() => actions.createItem(sectionId, {}, fd({ name: "Bananas", unit: "bunch", min: "0.5", max: "4" })));
-    expect(r.redirect).toMatch(/^\/admin\/items\//);
-    itemId = r.redirect!.split("/").pop()!;
-    const rules = await rulesOf(itemId);
-    expect(rules).toHaveLength(1);
-    expect(rules[0]).toMatchObject({ type: "DEFAULT" });
-    expect(Number(rules[0].min)).toBe(0.5);
+  it("rejects bad custom days and one-time dates, saving nothing", async () => {
+    let r = await run(() =>
+      actions.createItem(sectionId, {}, itemFd({ weekdays: [{ day: 6, min: "7", max: "6" }] })),
+    );
+    expect(r.result?.fieldErrors?.weekdays).toMatch(/Saturday/);
+    r = await run(() =>
+      actions.createItem(sectionId, {}, itemFd({ weekdays: [{ day: 6, min: "1", max: "2" }, { day: 6, min: "1", max: "2" }] })),
+    );
+    expect(r.result?.fieldErrors?.weekdays).toMatch(/twice/);
+    r = await run(() => actions.createItem(sectionId, {}, itemFd({ dates: [{ date: "2020-01-01", min: "1", max: "2" }] })));
+    expect(r.result?.fieldErrors?.dates).toMatch(/past/);
+    r = await run(() => actions.createItem(sectionId, {}, fd({ name: "X", unit: "box", min: "1", max: "2", weekdays: "not json", dates: "[]" })));
+    expect(r.result?.fieldErrors?.weekdays).toBeTruthy();
+    expect(await prisma.item.count({ where: { sectionId } })).toBe(0);
   });
 
-  it("weekday group creates one row per day, and re-applying updates instead of duplicating", async () => {
-    await run(() => actions.setWeekdayRules(itemId, {}, fd({ days: ["5", "6", "0"], min: "3", max: "6" })));
-    let weekday = (await rulesOf(itemId)).filter((r) => r.type === "WEEKDAY");
-    expect(weekday.map((r) => r.weekday)).toEqual([0, 5, 6]);
-    await run(() => actions.setWeekdayRules(itemId, {}, fd({ days: ["6"], min: "4", max: "7" })));
-    weekday = (await rulesOf(itemId)).filter((r) => r.type === "WEEKDAY");
-    expect(weekday).toHaveLength(3);
-    expect(Number(weekday.find((r) => r.weekday === 6)!.max)).toBe(7);
-    const none = await run(() => actions.setWeekdayRules(itemId, {}, fd({ min: "1", max: "2" })));
-    expect(none.result?.fieldErrors?.days).toBeTruthy();
-  });
-
-  it("resets a weekday back to default", async () => {
-    await run(() => actions.clearWeekdayRule(fd({ itemId, weekday: "0" })));
-    expect((await rulesOf(itemId)).filter((r) => r.type === "WEEKDAY").map((r) => r.weekday)).toEqual([5, 6]);
-  });
-
-  it("one rule per date: setting the same date again updates it", async () => {
-    await run(() => actions.setDateRule(itemId, {}, fd({ date: "2027-02-13", min: "5", max: "5" })));
-    await run(() => actions.setDateRule(itemId, {}, fd({ date: "2027-02-13", min: "6", max: "6" })));
-    const dates = (await rulesOf(itemId)).filter((r) => r.type === "DATE");
-    expect(dates).toHaveLength(1);
-    expect(Number(dates[0].min)).toBe(6);
-    await run(() => actions.removeDateRule(fd({ itemId, ruleId: dates[0].id })));
-    expect((await rulesOf(itemId)).filter((r) => r.type === "DATE")).toHaveLength(0);
-  });
-
-  it("updates the item and its default", async () => {
-    const r = await run(() => actions.updateItem(itemId, {}, fd({ name: "Bananas", unit: "bunches", min: "2", max: "4" })));
+  it("creates an item with default, custom days (one row per day) and one-time dates together", async () => {
+    const r = await run(() =>
+      actions.createItem(
+        sectionId,
+        {},
+        itemFd({
+          min: "0.5",
+          max: "4",
+          weekdays: [5, 6, 0].map((day) => ({ day, min: "3", max: "6" })),
+          dates: [{ date: "2027-02-13", min: "5", max: "5" }],
+        }),
+      ),
+    );
     expect(r.result?.ok).toBe(true);
-    const defaults = (await rulesOf(itemId)).filter((r) => r.type === "DEFAULT");
-    expect(defaults).toHaveLength(1);
-    expect(Number(defaults[0].min)).toBe(2);
+    const item = await prisma.item.findFirstOrThrow({ where: { sectionId, name: "Bananas" } });
+    itemId = item.id;
+    const rules = await rulesOf(itemId);
+    expect(rules.filter((x) => x.type === "DEFAULT").map((x) => Number(x.min))).toEqual([0.5]);
+    expect(rules.filter((x) => x.type === "WEEKDAY").map((x) => x.weekday)).toEqual([0, 5, 6]);
+    expect(rules.filter((x) => x.type === "DATE")).toHaveLength(1);
   });
 
-  it("deactivating an item keeps its rules", async () => {
-    const before = (await rulesOf(itemId)).length;
-    await run(() => actions.setItemActive(fd({ itemId, active: "false" })));
-    expect((await prisma.item.findUniqueOrThrow({ where: { id: itemId } })).active).toBe(false);
-    expect((await rulesOf(itemId)).length).toBe(before);
-    await run(() => actions.setItemActive(fd({ itemId, active: "true" })));
+  it("rejects a duplicate item name in the same section", async () => {
+    const r = await run(() => actions.createItem(sectionId, {}, itemFd()));
+    expect(r.result?.fieldErrors?.name).toMatch(/already has/);
+  });
+
+  it("saving the editor replaces default, custom days and upcoming dates", async () => {
+    const r = await run(() =>
+      actions.updateItem(
+        itemId,
+        {},
+        itemFd({
+          unit: "bunches",
+          min: "2",
+          max: "4",
+          weekdays: [{ day: 6, min: "4", max: "7" }],
+          dates: [{ date: "2027-03-01", min: "1", max: "1" }],
+        }),
+      ),
+    );
+    expect(r.result?.ok).toBe(true);
+    const rules = await rulesOf(itemId);
+    expect(rules.filter((x) => x.type === "DEFAULT").map((x) => Number(x.min))).toEqual([2]);
+    const weekday = rules.filter((x) => x.type === "WEEKDAY");
+    expect(weekday.map((x) => [x.weekday, Number(x.max)])).toEqual([[6, 7]]);
+    const dates = rules.filter((x) => x.type === "DATE").map((x) => x.date!.toISOString().slice(0, 10));
+    expect(dates).toEqual(["2027-03-01"]);
+    expect((await prisma.item.findUniqueOrThrow({ where: { id: itemId } })).unit).toBe("bunches");
+  });
+
+  it("keeps past one-time dates when saving", async () => {
+    await prisma.quantityRule.create({
+      data: { itemId, type: RuleType.DATE, date: new Date("2020-05-05T00:00:00Z"), min: 9, max: 9 },
+    });
+    await run(() => actions.updateItem(itemId, {}, itemFd()));
+    const dates = (await rulesOf(itemId)).filter((x) => x.type === "DATE").map((x) => x.date!.toISOString().slice(0, 10));
+    expect(dates).toEqual(["2020-05-05"]);
+  });
+
+  it("delete removes the item and all its rules", async () => {
+    await run(() => actions.createItem(sectionId, {}, itemFd({ name: "Temp", weekdays: [{ day: 1, min: "1", max: "1" }] })));
+    const temp = await prisma.item.findFirstOrThrow({ where: { sectionId, name: "Temp" } });
+    const r = await run(() => actions.deleteItem(temp.id));
+    expect(r.redirect).toBe(`/admin/sections/${sectionId}`);
+    expect(await prisma.item.findUnique({ where: { id: temp.id } })).toBeNull();
+    expect(await prisma.quantityRule.count({ where: { itemId: temp.id } })).toBe(0);
+  });
+
+  it("delete refuses an item that has been counted", async () => {
+    const submission = await prisma.submission.create({
+      data: {
+        cafeId: ids.cafeA,
+        userId: ids.adminA,
+        businessDate: new Date("2026-11-20T00:00:00Z"),
+        lines: { create: { itemId, currentCount: 1, autoOrder: 3, finalOrder: 3 } },
+      },
+    });
+    const r = await run(() => actions.deleteItem(itemId));
+    expect(r.result?.error).toMatch(/counted before/);
+    expect(await prisma.item.findUnique({ where: { id: itemId } })).not.toBeNull();
+    await prisma.submission.delete({ where: { id: submission.id } });
   });
 
   it("cannot touch cafe B's sections or items by id", async () => {
     const attempts: Array<() => Promise<unknown>> = [
       () => actions.updateSection(ids.sectionB, {}, fd({ name: "Hacked", color: "#6b8f71" })),
       () => actions.setSectionActive(fd({ sectionId: ids.sectionB, active: "false" })),
-      () => actions.createItem(ids.sectionB, {}, fd({ name: "X", unit: "box", min: "1", max: "2" })),
-      () => actions.updateItem(ids.itemB, {}, fd({ name: "Hacked", unit: "box", min: "1", max: "2" })),
-      () => actions.setItemActive(fd({ itemId: ids.itemB, active: "false" })),
-      () => actions.setWeekdayRules(ids.itemB, {}, fd({ days: ["1"], min: "1", max: "2" })),
-      () => actions.setDateRule(ids.itemB, {}, fd({ date: "2027-01-01", min: "1", max: "2" })),
-      () => actions.clearWeekdayRule(fd({ itemId: ids.itemB, weekday: "1" })),
-      () => actions.moveItem(fd({ itemId: ids.itemB, direction: "up" })),
+      () => actions.createItem(ids.sectionB, {}, fd({ name: "X", unit: "box", min: "1", max: "2", weekdays: "[]", dates: "[]" })),
+      () => actions.updateItem(ids.itemB, {}, fd({ name: "Hacked", unit: "box", min: "1", max: "2", weekdays: "[]", dates: "[]" })),
+      () => actions.deleteItem(ids.itemB),
     ];
     for (const attempt of attempts) expect((await run(attempt)).notFound).toBe(true);
     const sectionB = await prisma.section.findUniqueOrThrow({ where: { id: ids.sectionB } });
@@ -234,7 +294,7 @@ describe("non-admins", () => {
       () => actions.createSection({}, fd({ name: "Sneaky", color: "#6b8f71" })),
       () => actions.updateSection(section.id, {}, fd({ name: "Sneaky", color: "#6b8f71" })),
       () => actions.setSectionActive(fd({ sectionId: section.id, active: "false" })),
-      () => actions.createItem(section.id, {}, fd({ name: "X", unit: "box", min: "1", max: "2" })),
+      () => actions.createItem(section.id, {}, fd({ name: "X", unit: "box", min: "1", max: "2", weekdays: "[]", dates: "[]" })),
     ];
     for (const attempt of attempts) expect((await run(attempt)).redirect).toBe("/inventory");
     expect(await prisma.section.count({ where: { cafeId: ids.cafeA } })).toBe(before);

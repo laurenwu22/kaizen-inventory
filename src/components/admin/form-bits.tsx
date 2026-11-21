@@ -69,15 +69,7 @@ export function QtyInput({
 }
 
 /** Seven tap-to-toggle day chips, Monday first. Submits as repeated "days" fields. */
-export function DayPicker({
-  defaultValue = [],
-  shortcuts = false,
-  name = "days",
-}: {
-  defaultValue?: number[];
-  shortcuts?: boolean;
-  name?: string;
-}) {
+export function DayPicker({ defaultValue = [], name = "days" }: { defaultValue?: number[]; name?: string }) {
   const [selected, setSelected] = useState<Set<number>>(new Set(defaultValue));
   const toggle = (d: number) =>
     setSelected((cur) => {
@@ -86,7 +78,6 @@ export function DayPicker({
       else next.add(d);
       return next;
     });
-  const set = (days: number[]) => setSelected(new Set(days));
 
   return (
     <div>
@@ -111,25 +102,6 @@ export function DayPicker({
       {[...selected].map((d) => (
         <input key={d} type="hidden" name={name} value={d} />
       ))}
-      {shortcuts && (
-        <div className="mt-2 flex flex-wrap gap-2 text-sm">
-          {[
-            { label: "Every day", days: [0, 1, 2, 3, 4, 5, 6] },
-            { label: "Weekdays", days: [1, 2, 3, 4, 5] },
-            { label: "Weekends", days: [0, 6] },
-            { label: "Clear", days: [] },
-          ].map((s) => (
-            <button
-              key={s.label}
-              type="button"
-              onClick={() => set(s.days)}
-              className="h-9 rounded-full px-3 font-medium text-ink/70 ring-1 ring-ink/15 active:bg-cream"
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
