@@ -9,6 +9,7 @@ import { formatQty, WEEK_ORDER, WEEKDAY_SHORT } from "@/lib/quantity";
 import { formatYmd } from "@/lib/time";
 import { ui } from "@/components/ui";
 import { FieldError, FormError, SubmitButton } from "./form-bits";
+import { DateField } from "./date-field";
 
 type Amounts = { min: string; max: string };
 export type ItemEditorValues = {
@@ -358,13 +359,11 @@ function OneTimeDates({
           <label className={ui.label} htmlFor="one-time-date">
             Date
           </label>
-          <input
+          <DateField
             id="one-time-date"
-            type="date"
             min={today}
             value={draft.date}
-            onChange={(e) => setDraft((d) => ({ ...d, date: e.target.value }))}
-            className={ui.input}
+            onChange={(date) => setDraft((d) => ({ ...d, date }))}
           />
         </div>
       ) : (

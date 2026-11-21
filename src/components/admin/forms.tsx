@@ -5,6 +5,7 @@ import { useActionState, useEffect, useRef } from "react";
 import type { FormState } from "@/lib/admin/validation";
 import { ui } from "@/components/ui";
 import { ColorPicker, DayPicker, FieldError, FormError, SavedNote, SubmitButton } from "./form-bits";
+import { DateField } from "./date-field";
 
 type Action = (prev: FormState, fd: FormData) => Promise<FormState>;
 
@@ -71,7 +72,10 @@ export function ExtraDateForm({ action, minDate }: { action: Action; minDate: st
         Add a one-time date
       </label>
       <div className="flex gap-2">
-        <input id="extra-date" name="date" type="date" min={minDate} className={ui.input} />
+        <div className="min-w-0 flex-1">
+          {/* Re-mount after a successful add so the field clears */}
+          <DateField key={state.savedAt ?? 0} id="extra-date" name="date" min={minDate} label="One-time date" />
+        </div>
         <SubmitButton className={`${ui.secondary} h-12 shrink-0`}>Add</SubmitButton>
       </div>
       <FieldError state={state} name="date" />
