@@ -15,17 +15,15 @@ export function DeleteItemButton({
   const [state, formAction, pending] = useActionState(action, {});
   const [armed, setArmed] = useState(false);
   return (
-    <form action={formAction}>
+    <form action={formAction} className="flex flex-col items-center text-center">
       {!armed ? (
         <button type="button" onClick={() => setArmed(true)} className={`${ui.secondary} text-red-700`}>
           Delete item
         </button>
       ) : (
-        <div className="rounded-2xl bg-red-50 p-4 ring-1 ring-red-200">
-          <p className="mb-3 text-sm text-red-900">
-            Permanently delete <strong>{itemName}</strong> and all its amounts? This can&apos;t be undone.
-          </p>
-          <div className="flex items-center gap-2">
+        <div className="w-full max-w-sm rounded-2xl bg-red-50 p-5 ring-1 ring-red-200">
+          <p className="mb-4 font-semibold text-red-900">Are you sure you want to delete {itemName}?</p>
+          <div className="flex items-center justify-center gap-2">
             <button
               type="submit"
               disabled={pending}

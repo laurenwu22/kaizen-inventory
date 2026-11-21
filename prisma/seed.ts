@@ -70,15 +70,15 @@ const SAMPLE: { name: string; color: string; days: number[]; items: SampleItem[]
     items: [
       {
         name: "Bananas",
-        unit: "bunch",
+        unit: "bunches",
         min: 2,
         max: 4,
         weekdays: { days: [5, 6, 0], min: 3, max: 6 }, // Fri-Sun
         date: { date: "2027-02-13", min: 5, max: 5 },
       },
-      { name: "Cucumber", unit: "gallon", min: 1, max: 3 },
-      { name: "Lemons", unit: "bag", min: 1, max: 2 },
-      { name: "Mint", unit: "bunch", min: 0.5, max: 2 },
+      { name: "Cucumber", unit: "gallons", min: 1, max: 3 },
+      { name: "Lemons", unit: "bags", min: 1, max: 2 },
+      { name: "Mint", unit: "bunches", min: 0.5, max: 2 },
     ],
   },
   {
@@ -86,8 +86,8 @@ const SAMPLE: { name: string; color: string; days: number[]; items: SampleItem[]
     color: "#b8694a",
     days: [1, 4], // Mon, Thu
     items: [
-      { name: "Brown sugar", unit: "bag", min: 1, max: 3 },
-      { name: "Vanilla extract", unit: "bottle", min: 1, max: 2 },
+      { name: "Brown sugar", unit: "bags", min: 1, max: 3 },
+      { name: "Vanilla extract", unit: "bottles", min: 1, max: 2 },
     ],
   },
   {
@@ -95,9 +95,9 @@ const SAMPLE: { name: string; color: string; days: number[]; items: SampleItem[]
     color: "#4f7896",
     days: [0, 1, 2, 3, 4, 5, 6],
     items: [
-      { name: "Whole", unit: "gallon", min: 10, max: 30 },
-      { name: "Oat", unit: "carton", min: 6, max: 18 },
-      { name: "Almond", unit: "carton", min: 2, max: 6 },
+      { name: "Whole", unit: "gallons", min: 10, max: 30 },
+      { name: "Oat", unit: "cartons", min: 6, max: 18 },
+      { name: "Almond", unit: "cartons", min: 2, max: 6 },
     ],
   },
 ];

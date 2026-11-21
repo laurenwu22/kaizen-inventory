@@ -201,8 +201,8 @@ export async function updateItem(itemId: string, _prev: FormState, fd: FormData)
     if (isUniqueViolation(e)) return { fieldErrors: { name: "This section already has an item with this name" } };
     throw e;
   }
-  refresh();
-  return saved();
+  // Back to the item's section after saving.
+  redirect(`/admin/sections/${item.sectionId}`);
 }
 
 /**

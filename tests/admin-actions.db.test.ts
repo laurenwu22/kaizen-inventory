@@ -224,7 +224,7 @@ describe("admin at cafe A", () => {
         }),
       ),
     );
-    expect(r.result?.ok).toBe(true);
+    expect(r.redirect).toBe(`/admin/sections/${sectionId}`);
     const rules = await rulesOf(itemId);
     expect(rules.filter((x) => x.type === "DEFAULT").map((x) => Number(x.min))).toEqual([2]);
     const weekday = rules.filter((x) => x.type === "WEEKDAY");

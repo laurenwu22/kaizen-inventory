@@ -90,7 +90,7 @@ export function ItemEditor({
             list="unit-suggestions"
             value={unit}
             onChange={(e) => setUnit(e.target.value)}
-            placeholder="e.g. bunch"
+            placeholder="e.g. bunches"
             className={ui.input}
             autoComplete="off"
           />
