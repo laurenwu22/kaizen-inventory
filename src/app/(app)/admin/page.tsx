@@ -1,12 +1,14 @@
 import { Suspense } from "react";
+import { ContentSpinner, PendingButton } from "@/components/spinner";
+import { SectionList } from "@/components/admin/section-list";
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth/dal";
 import { prisma } from "@/lib/db";
 import { describeDays } from "@/lib/quantity";
 import { laDateString } from "@/lib/time";
-import { AdminChrome, ColorDot, MoveButtons, PageTitle } from "@/components/admin/admin-chrome";
+import { ColorDot, PageTitle } from "@/components/admin/admin-chrome";
 import { ui } from "@/components/ui";
-import { moveSection, setSectionActive } from "./actions";
+import { setSectionActive } from "./actions";
 
 // Admin > Sections: every section at the selected cafe, in employee order.
 
@@ -25,7 +27,7 @@ async function SectionsAdmin() {
   const inactive = sections.filter((s) => !s.active);
 
   return (
-    <AdminChrome session={session} tab="sections">
+    <>
       <PageTitle
         action={
           <Link href="/admin/sections/new" className={ui.primary}>
@@ -41,32 +43,20 @@ async function SectionsAdmin() {
           No sections yet. Add one, such as Perishables or Milk, then add the items to count in it.
         </div>
       ) : (
-        <ul className="flex flex-col gap-3">
-          {active.map((s, i) => (
-            <li key={s.id} className={`${ui.card} flex items-center gap-3 p-3 pl-4`}>
-              <Link href={`/admin/sections/${s.id}`} className="flex min-w-0 flex-1 items-center gap-3 py-1">
-                <ColorDot color={s.color} size={14} />
-                <span className="min-w-0">
-                  <span className="block truncate font-semibold">{s.name}</span>
-                  <span className="block truncate text-sm text-ink/60">
-                    {describeDays(s.daysOfWeek)}
-                    {s.extraDates.length > 0 &&
-                      ` · +${s.extraDates.length} date${s.extraDates.length > 1 ? "s" : ""}`}
-                    {` · ${s._count.items} item${s._count.items === 1 ? "" : "s"}`}
-                  </span>
-                </span>
-              </Link>
-              <MoveButtons
-                action={moveSection}
-                idName="sectionId"
-                id={s.id}
-                isFirst={i === 0}
-                isLast={i === active.length - 1}
-                label={s.name}
-              />
-            </li>
-          ))}
-        </ul>
+        <SectionList
+          sections={active.map((s) => ({
+            id: s.id,
+            name: s.name,
+            color: s.color,
+            subtitle: [
+              describeDays(s.daysOfWeek),
+              s.extraDates.length > 0 ? `+${s.extraDates.length} date${s.extraDates.length > 1 ? "s" : ""}` : null,
+              `${s._count.items} item${s._count.items === 1 ? "" : "s"}`,
+            ]
+              .filter(Boolean)
+              .join(" · "),
+          }))}
+        />
       )}
 
       {inactive.length > 0 && (
@@ -84,23 +74,21 @@ async function SectionsAdmin() {
                 <form action={setSectionActive}>
                   <input type="hidden" name="sectionId" value={s.id} />
                   <input type="hidden" name="active" value="true" />
-                  <button className={ui.secondary}>Reactivate</button>
+                  <PendingButton className={ui.secondary}>Reactivate</PendingButton>
                 </form>
               </li>
             ))}
           </ul>
         </details>
       )}
-    </AdminChrome>
+    </>
   );
 }
 
 export default function AdminPage() {
   return (
-    <main className="flex flex-1 flex-col">
-      <Suspense fallback={<p className="p-6 text-ink/60">Loading…</p>}>
-        <SectionsAdmin />
-      </Suspense>
-    </main>
+    <Suspense fallback={<ContentSpinner />}>
+      <SectionsAdmin />
+    </Suspense>
   );
 }

@@ -1,10 +1,12 @@
 "use client";
 
+import { useFormStatus } from "react-dom";
 import { selectCafe } from "@/app/actions/auth";
+import { Spinner } from "./spinner";
 
 export function CafeSwitcher({ current, cafes }: { current: string; cafes: { id: string; name: string }[] }) {
   return (
-    <form action={selectCafe}>
+    <form action={selectCafe} className="flex items-center gap-2">
       <label className="sr-only" htmlFor="cafe-switcher">Cafe</label>
       <select
         id="cafe-switcher"
@@ -17,6 +19,12 @@ export function CafeSwitcher({ current, cafes }: { current: string; cafes: { id:
           <option key={c.id} value={c.id}>{c.name}</option>
         ))}
       </select>
+      <SwitchingIndicator />
     </form>
   );
+}
+
+function SwitchingIndicator() {
+  const { pending } = useFormStatus();
+  return pending ? <Spinner size={16} className="mt-1 text-gold" /> : null;
 }

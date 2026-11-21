@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 import { SECTION_COLORS, type FormState } from "@/lib/admin/validation";
 import { WEEK_ORDER, WEEKDAY_SHORT } from "@/lib/quantity";
 import { ui } from "@/components/ui";
+import { PendingButton, Spinner } from "@/components/spinner";
 
 export function FieldError({ state, name }: { state: FormState; name: string }) {
   const msg = state.fieldErrors?.[name];
@@ -23,12 +24,7 @@ export function SubmitButton({
   children: React.ReactNode;
   className?: string;
 }) {
-  const { pending } = useFormStatus();
-  return (
-    <button type="submit" disabled={pending} className={className}>
-      {pending ? "Saving…" : children}
-    </button>
-  );
+  return <PendingButton className={className}>{children}</PendingButton>;
 }
 
 /** Saved confirmation that fades in after a successful save. */
@@ -156,7 +152,7 @@ export function ConfirmSubmit({
         disabled={pending}
         className="inline-flex h-11 items-center justify-center rounded-full bg-red-700 px-4 text-sm font-semibold text-white active:bg-red-800 disabled:opacity-40"
       >
-        {confirmLabel}
+        {pending ? <Spinner /> : confirmLabel}
       </button>
       <button type="button" className="h-11 px-3 text-sm text-ink/60" onClick={() => setArmed(false)}>
         Cancel

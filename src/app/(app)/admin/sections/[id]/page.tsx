@@ -1,11 +1,12 @@
 import { Suspense } from "react";
+import { ContentSpinner, LinkSpinner, PendingButton } from "@/components/spinner";
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth/dal";
 import { prisma } from "@/lib/db";
 import { cafeUnits, getOwnedSection, toRule } from "@/lib/admin/data";
 import { compareNames, formatQty, WEEKDAY_SHORT } from "@/lib/quantity";
 import { dateOnlyString, formatYmd, laDateString } from "@/lib/time";
-import { AdminChrome, BackLink, Card, ColorDot, PageTitle } from "@/components/admin/admin-chrome";
+import { BackLink, Card, ColorDot, PageTitle } from "@/components/admin/admin-chrome";
 import { ConfirmSubmit } from "@/components/admin/form-bits";
 import { ExtraDateForm, SectionForm } from "@/components/admin/forms";
 import { ui } from "@/components/ui";
@@ -33,7 +34,7 @@ async function SectionAdmin({ params }: { params: Promise<{ id: string }> }) {
   const activeItems = items.filter((i) => i.active).sort((a, b) => compareNames(a.name, b.name));
 
   return (
-    <AdminChrome session={session} tab="sections">
+    <>
       <BackLink href="/admin">Sections</BackLink>
       <PageTitle>
         <span className="flex items-center gap-3">
@@ -66,7 +67,11 @@ async function SectionAdmin({ params }: { params: Promise<{ id: string }> }) {
                 const upcomingDates = rules.filter((r) => r.type === "DATE" && r.date! >= today);
                 return (
                   <li key={item.id} className="flex items-center gap-2 rounded-xl px-2 py-1.5">
-                    <Link href={`/admin/items/${item.id}`} className="min-w-0 flex-1 rounded-xl py-1.5 active:bg-cream">
+                    <Link
+                      href={`/admin/items/${item.id}`}
+                      className="flex min-w-0 flex-1 items-center gap-3 rounded-xl py-1.5 active:bg-cream"
+                    >
+                      <span className="min-w-0 flex-1">
                       <span className="block truncate font-semibold">{item.name}</span>
                       <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink/60">
                         <span>
@@ -86,6 +91,8 @@ async function SectionAdmin({ params }: { params: Promise<{ id: string }> }) {
                         )}
                         {!def && <Badge tone="warn">Needs default</Badge>}
                       </span>
+                      </span>
+                      <LinkSpinner />
                     </Link>
                   </li>
                 );
@@ -117,9 +124,9 @@ async function SectionAdmin({ params }: { params: Promise<{ id: string }> }) {
                     <form action={removeExtraDate}>
                       <input type="hidden" name="sectionId" value={section.id} />
                       <input type="hidden" name="date" value={ymd} />
-                      <button className="h-11 px-3 text-sm font-semibold text-red-700" aria-label={`Remove ${formatYmd(ymd)}`}>
+                      <PendingButton className="h-11 px-3 text-sm font-semibold text-red-700" aria-label={`Remove ${formatYmd(ymd)}`}>
                         Remove
-                      </button>
+                      </PendingButton>
                     </form>
                   </li>
                 );
@@ -140,11 +147,11 @@ async function SectionAdmin({ params }: { params: Promise<{ id: string }> }) {
               </p>
             </>
           ) : (
-            <button className={ui.primary}>Reactivate section</button>
+            <PendingButton className={ui.primary}>Reactivate section</PendingButton>
           )}
         </form>
       </div>
-    </AdminChrome>
+    </>
   );
 }
 
@@ -162,10 +169,8 @@ function Badge({ children, tone = "info" }: { children: React.ReactNode; tone?: 
 
 export default function SectionPage(props: PageProps<"/admin/sections/[id]">) {
   return (
-    <main className="flex flex-1 flex-col">
-      <Suspense fallback={<p className="p-6 text-ink/60">Loading…</p>}>
-        <SectionAdmin params={props.params} />
-      </Suspense>
-    </main>
+    <Suspense fallback={<ContentSpinner />}>
+      <SectionAdmin params={props.params} />
+    </Suspense>
   );
 }

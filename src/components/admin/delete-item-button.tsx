@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import type { FormState } from "@/lib/admin/validation";
 import { ui } from "@/components/ui";
+import { Spinner } from "@/components/spinner";
 
 /** Two-tap "Delete item" that permanently removes the item. */
 export function DeleteItemButton({
@@ -29,7 +30,7 @@ export function DeleteItemButton({
               disabled={pending}
               className="inline-flex h-11 items-center justify-center rounded-full bg-red-700 px-5 text-sm font-semibold text-white active:bg-red-800 disabled:opacity-40"
             >
-              {pending ? "Deleting…" : "Yes, delete"}
+              {pending ? <Spinner /> : "Yes, delete"}
             </button>
             <button type="button" onClick={() => setArmed(false)} className="h-11 px-3 text-sm font-semibold text-ink/60">
               Cancel

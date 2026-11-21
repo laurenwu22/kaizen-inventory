@@ -32,7 +32,7 @@ vi.mock("next/cache", () => ({ refresh: () => {}, revalidatePath: () => {} }));
 const { prisma } = await import("@/lib/db");
 const { Role, RuleType } = await import("@/generated/prisma/client");
 const { signSession } = await import("@/lib/auth/token");
-const actions = await import("@/app/admin/actions");
+const actions = await import("@/app/(app)/admin/actions");
 
 // No "_" or "%" in the tag: Prisma startsWith uses SQL LIKE.
 const tag = `test-admin-${Date.now()}`;

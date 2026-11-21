@@ -3,6 +3,7 @@
 import { startTransition, useActionState, useEffect, useState } from "react";
 import { signIn, type SignInState } from "@/app/actions/auth";
 import { PIN_MAX_LENGTH, PIN_MIN_LENGTH } from "@/lib/auth/pin";
+import { Spinner } from "@/components/spinner";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
@@ -51,7 +52,7 @@ export function PinPad() {
 
       <div className="mb-2 flex h-6 items-center justify-center gap-3" aria-live="polite">
         {digits.length === 0 ? (
-          <span className="text-sm text-ink/40">{pending ? "Signing in…" : " "}</span>
+          <span className="text-sm text-ink/40">{pending ? <span className="sr-only">Signing in</span> : " "}</span>
         ) : (
           Array.from({ length: digits.length }).map((_, i) => (
             <span key={i} className="h-3.5 w-3.5 rounded-full bg-ink" />
@@ -86,9 +87,10 @@ export function PinPad() {
           type="button"
           onClick={submit}
           disabled={!canSubmit}
-          className="h-16 rounded-2xl bg-ink text-lg font-semibold text-white shadow-sm active:bg-ink-hover disabled:opacity-30 select-none touch-manipulation"
+          aria-busy={pending}
+          className="flex h-16 items-center justify-center rounded-2xl bg-ink text-lg font-semibold text-white shadow-sm active:bg-ink-hover disabled:opacity-30 select-none touch-manipulation"
         >
-          Enter
+          {pending ? <Spinner size={22} className="mx-auto" /> : "Enter"}
         </button>
       </div>
     </div>

@@ -1,10 +1,11 @@
 import { Suspense } from "react";
+import { ContentSpinner } from "@/components/spinner";
 import { requireAdmin } from "@/lib/auth/dal";
 import { cafeUnits, getOwnedItem, toRule } from "@/lib/admin/data";
 import { prisma } from "@/lib/db";
 import { formatQty } from "@/lib/quantity";
 import { laDateString } from "@/lib/time";
-import { AdminChrome, BackLink, Card, ColorDot, PageTitle } from "@/components/admin/admin-chrome";
+import { BackLink, Card, ColorDot, PageTitle } from "@/components/admin/admin-chrome";
 import { DeleteItemButton } from "@/components/admin/delete-item-button";
 import { ItemEditor } from "@/components/admin/item-editor";
 import { deleteItem, updateItem } from "../../actions";
@@ -23,7 +24,7 @@ async function ItemAdmin({ params }: { params: Promise<{ id: string }> }) {
   const q = (n: number) => formatQty(n);
 
   return (
-    <AdminChrome session={session} tab="sections">
+    <>
       <BackLink href={`/admin/sections/${item.sectionId}`}>
         <span className="ml-1 inline-flex items-center gap-2">
           <ColorDot color={item.section.color} size={10} />
@@ -57,16 +58,14 @@ async function ItemAdmin({ params }: { params: Promise<{ id: string }> }) {
         </Card>
         <DeleteItemButton action={deleteItem.bind(null, item.id)} itemName={item.name} />
       </div>
-    </AdminChrome>
+    </>
   );
 }
 
 export default function ItemPage(props: PageProps<"/admin/items/[id]">) {
   return (
-    <main className="flex flex-1 flex-col">
-      <Suspense fallback={<p className="p-6 text-ink/60">Loading…</p>}>
-        <ItemAdmin params={props.params} />
-      </Suspense>
-    </main>
+    <Suspense fallback={<ContentSpinner />}>
+      <ItemAdmin params={props.params} />
+    </Suspense>
   );
 }

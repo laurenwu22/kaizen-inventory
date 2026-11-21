@@ -3,6 +3,7 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/dal";
 import { selectCafe, signOut } from "@/app/actions/auth";
+import { ContentSpinner, PendingButton } from "@/components/spinner";
 
 async function CafeChoices() {
   const session = await getSession();
@@ -15,7 +16,7 @@ async function CafeChoices() {
           You&apos;re not assigned to a cafe yet. Ask an admin to add you.
         </p>
         <form action={signOut}>
-          <button className="h-12 rounded-xl px-6 text-ink/80 ring-1 ring-ink/20">Sign out</button>
+          <PendingButton className="h-12 rounded-xl px-6 text-ink/80 ring-1 ring-ink/20">Sign out</PendingButton>
         </form>
       </div>
     );
@@ -30,14 +31,14 @@ async function CafeChoices() {
         {session.memberships.map((m) => (
           <form key={m.cafeId} action={selectCafe}>
             <input type="hidden" name="cafeId" value={m.cafeId} />
-            <button className="h-16 w-full rounded-2xl bg-white text-lg font-medium shadow-sm ring-1 ring-ink/10 active:bg-cream">
+            <PendingButton className="h-16 w-full rounded-2xl bg-white text-lg font-medium shadow-sm ring-1 ring-ink/10 active:bg-cream">
               {m.cafeName}
-            </button>
+            </PendingButton>
           </form>
         ))}
       </div>
       <form action={signOut} className="mt-8 text-center">
-        <button className="text-sm text-ink/60 underline">Not you? Sign out</button>
+        <PendingButton className="h-11 px-2 text-sm text-ink/60 underline">Not you? Sign out</PendingButton>
       </form>
     </div>
   );
@@ -48,7 +49,7 @@ export default function SelectCafePage() {
     <main className="flex flex-1 flex-col items-center justify-center px-6 py-10">
       <Image src="/logo.png" alt="Kaizen & Coffee" width={72} height={73} priority className="mb-4" />
       <h1 className="mb-6 text-2xl font-bold tracking-tight">Choose location</h1>
-      <Suspense fallback={<p className="text-ink/60">Loading…</p>}>
+      <Suspense fallback={<ContentSpinner />}>
         <CafeChoices />
       </Suspense>
     </main>

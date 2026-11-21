@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { signOut } from "@/app/actions/auth";
+import { PendingButton } from "./spinner";
 
 export type MenuItem = { label: string; href?: string };
 
@@ -99,9 +100,9 @@ export function AppMenu({
             action={signOut}
             className="border-t border-ink/10 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
           >
-            <button className="flex h-12 w-full items-center rounded-xl px-3 font-medium text-red-600 active:bg-red-50">
+            <PendingButton className="flex h-12 w-full items-center rounded-xl px-3 font-medium text-red-600 active:bg-red-50">
               Sign out
-            </button>
+            </PendingButton>
           </form>
         </div>
       </dialog>
