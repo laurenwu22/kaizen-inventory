@@ -32,27 +32,29 @@ enum RuleType {
 }
 
 model Cafe {
-  id          String       @id @default(cuid())
-  name        String       @unique
-  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
+  id          String        @id @default(cuid())
+  name        String        @unique
+  createdAt   DateTime      @default(now()) @db.Timestamptz(3)
   members     UserCafe[]
   sections    Section[]
   submissions Submission[]
+  additions   DayAddition[]
 }
 
 model User {
-  id          String       @id @default(cuid())
+  id          String        @id @default(cuid())
   /// Used in greetings ("Welcome back, Maria") and Slack "Submitted by".
   firstName   String
   lastName    String
   /// Matches the person's Toast PIN. String so leading zeros are kept.
   /// Unique across all cafes.
-  pin         String       @unique
-  active      Boolean      @default(true)
-  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
-  updatedAt   DateTime     @updatedAt @db.Timestamptz(3)
+  pin         String        @unique
+  active      Boolean       @default(true)
+  createdAt   DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime      @updatedAt @db.Timestamptz(3)
   cafes       UserCafe[]
   submissions Submission[]
+  additions   DayAddition[]
 }
 
 /// Membership of a user at a cafe. Admin status is per cafe.
@@ -83,6 +85,7 @@ model Section {
   cafe       Cafe               @relation(fields: [cafeId], references: [id], onDelete: Restrict)
   extraDates SectionExtraDate[]
   items      Item[]
+  additions  DayAddition[]
 
   @@unique([cafeId, name])
 }
@@ -109,6 +112,7 @@ model Item {
   section   Section          @relation(fields: [sectionId], references: [id], onDelete: Restrict)
   rules     QuantityRule[]
   lines     SubmissionLine[]
+  additions DayAddition[]
 
   // CSV import matches on (section name, item name).
   @@unique([sectionId, name])
@@ -179,4 +183,24 @@ model LoginAttempt {
 
   @@index([ip, createdAt])
   @@index([createdAt])
+}
+
+/// A section or item an employee added to a cafe's count for one day (not
+/// scheduled that day). Shared, so everyone counting that day sees it.
+/// Exactly one of sectionId / itemId is set (enforced in SQL).
+model DayAddition {
+  id           String   @id @default(cuid())
+  cafeId       String
+  businessDate DateTime @db.Date
+  sectionId    String?
+  itemId       String?
+  addedById    String
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  cafe         Cafe     @relation(fields: [cafeId], references: [id], onDelete: Cascade)
+  section      Section? @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  item         Item?    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  addedBy      User     @relation(fields: [addedById], references: [id], onDelete: Restrict)
+
+  @@unique([cafeId, businessDate, sectionId, itemId])
+  @@index([cafeId, businessDate])
 }

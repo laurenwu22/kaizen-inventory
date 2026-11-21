@@ -31,17 +31,18 @@ const { Role, RuleType } = await import("@/generated/prisma/client");
 const { signSession } = await import("@/lib/auth/token");
 const { laDateString, weekdayOf } = await import("@/lib/time");
 const { submitInventory } = await import("@/app/(app)/inventory/actions");
-const { loadCombinedOrder } = await import("@/lib/combined-data");
+const { loadCombinedOrder, loadDayAdditions } = await import("@/lib/combined-data");
 
 // No "_" or "%" in the tag: Prisma startsWith uses SQL LIKE.
 const tag = `test-inv-${Date.now()}`;
-const ids = { cafeA: "", cafeB: "", employee: "", bananas: "", milk: "", offItem: "", itemB: "" };
+const ids = { cafeA: "", cafeB: "", employee: "", bananas: "", milk: "", offItem: "", itemB: "", perishables: "", sectionB: "" };
 const today = laDateString();
 
 type Line = { itemId: string; currentCount: string; finalOrder: string; manuallyEdited: boolean; plenty?: boolean };
-const submit = async (lines: Line[] | string) => {
+const submit = async (lines: Line[] | string, added?: { sections?: string[]; items?: string[] }) => {
   const fd = new FormData();
   fd.set("lines", typeof lines === "string" ? lines : JSON.stringify(lines));
+  if (added) fd.set("added", JSON.stringify(added));
   try {
     return { result: await submitInventory({}, fd), redirect: null as string | null };
   } catch (e) {
@@ -79,8 +80,10 @@ beforeAll(async () => {
     })
   ).id;
   const per = await prisma.section.create({ data: { cafeId: a.id, name: "Perishables", daysOfWeek: [] } });
+  ids.perishables = per.id;
   const off = await prisma.section.create({ data: { cafeId: a.id, name: "Retired", active: false } });
   const secB = await prisma.section.create({ data: { cafeId: b.id, name: "B" } });
+  ids.sectionB = secB.id;
   const mk = (sectionId: string, name: string, rules: { type: (typeof RuleType)[keyof typeof RuleType]; weekday?: number; min: number; max: number }[]) =>
     prisma.item.create({ data: { sectionId, name, unit: "units", rules: { create: rules } } });
   // Bananas: default 2-4, but today's weekday is 3-6 so the server must use today's rule.
@@ -99,6 +102,7 @@ beforeAll(async () => {
 afterAll(async () => {
   const cafeIds = [ids.cafeA, ids.cafeB].filter(Boolean);
   await prisma.submission.deleteMany({ where: { cafeId: { in: cafeIds } } });
+  await prisma.dayAddition.deleteMany({ where: { cafeId: { in: cafeIds } } });
   await prisma.quantityRule.deleteMany({ where: { item: { section: { cafeId: { in: cafeIds } } } } });
   await prisma.item.deleteMany({ where: { section: { cafeId: { in: cafeIds } } } });
   await prisma.section.deleteMany({ where: { cafeId: { in: cafeIds } } });
@@ -223,6 +227,43 @@ describe("Plenty", () => {
       prisma.submissionLine.create({ data: { submissionId: sub.id, itemId: ids.milk, currentCount: null, autoOrder: 0, finalOrder: 0, wellStocked: false } }),
     ).rejects.toThrow();
     await prisma.submission.delete({ where: { id: sub.id } });
+  });
+});
+
+describe("sections and items added for today", () => {
+  it("are recorded with the submission and shared with who added them", async () => {
+    await submit([line(ids.bananas, "3")], { sections: [ids.perishables], items: [ids.milk] });
+    const shared = await loadDayAdditions(ids.cafeA, today);
+    expect(shared.sections[ids.perishables]).toBe(`${tag}-emp`);
+    expect(shared.items[ids.milk]).toBe(`${tag}-emp`);
+  });
+
+  it("adding the same section again doesn't duplicate it", async () => {
+    await submit([line(ids.bananas, "3")], { sections: [ids.perishables] });
+    expect(await prisma.dayAddition.count({ where: { cafeId: ids.cafeA, sectionId: ids.perishables } })).toBe(1);
+  });
+
+  it("ignores another cafe's sections/items and inactive ones", async () => {
+    await submit([line(ids.bananas, "3")], { sections: [ids.sectionB], items: [ids.itemB, ids.offItem] });
+    expect(await prisma.dayAddition.count({ where: { OR: [{ sectionId: ids.sectionB }, { itemId: { in: [ids.itemB, ids.offItem] } }] } })).toBe(0);
+  });
+
+  it("aren't shared until submitted (nothing recorded on a failed submit)", async () => {
+    const before = await prisma.dayAddition.count({ where: { cafeId: ids.cafeA } });
+    const r = await submit([line(ids.bananas, "-1")], { items: [ids.bananas] });
+    expect(r.result?.error).toBeTruthy();
+    expect(await prisma.dayAddition.count({ where: { cafeId: ids.cafeA } })).toBe(before);
+  });
+
+  it("the database allows exactly one of section or item", async () => {
+    await expect(
+      prisma.dayAddition.create({ data: { cafeId: ids.cafeA, businessDate: new Date(`${today}T00:00:00Z`), addedById: ids.employee } }),
+    ).rejects.toThrow();
+    await expect(
+      prisma.dayAddition.create({
+        data: { cafeId: ids.cafeA, businessDate: new Date(`${today}T00:00:00Z`), addedById: ids.employee, sectionId: ids.perishables, itemId: ids.milk },
+      }),
+    ).rejects.toThrow();
   });
 });
 

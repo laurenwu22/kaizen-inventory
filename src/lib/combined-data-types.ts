@@ -7,3 +7,11 @@ export type SubmittedEntry = {
   by: string; // first name
   at: string; // ISO
 };
+
+/** Sections/items added to a cafe's count for a day (shared once submitted). */
+export type SharedAdditions = {
+  /** sectionId -> first name of who added it */
+  sections: Record<string, string>;
+  /** itemId -> first name of who added it */
+  items: Record<string, string>;
+};

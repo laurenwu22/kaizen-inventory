@@ -10,7 +10,7 @@
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { submitInventory, type SubmitState } from "@/app/(app)/inventory/actions";
 import type { CountItem, CountSection } from "@/lib/inventory";
-import type { SubmittedEntry } from "@/lib/combined-data-types";
+import type { SharedAdditions, SubmittedEntry } from "@/lib/combined-data-types";
 import { baselineEntry, isBlank, sameEntry, type Entry } from "@/lib/prefill";
 import { computeAutoOrder, parseOrder, parseQty, stepCount } from "@/lib/order";
 import { formatQty } from "@/lib/quantity";
@@ -65,11 +65,14 @@ export function CountForm({
   draftKey,
   slackText,
   baseline,
+  shared,
 }: {
   sheet: CountSection[];
   draftKey: string;
   /** Today's latest submitted entry per item, used to pre-fill. */
   baseline: Record<string, SubmittedEntry>;
+  /** Sections/items others added to today's count and submitted. */
+  shared: SharedAdditions;
   /** Today's combined order as Slack text, once anyone has submitted today. */
   slackText: string | null;
 }) {
@@ -125,16 +128,22 @@ export function CountForm({
     return m;
   }, [sheet]);
 
-  // What's on screen: scheduled + added sections in full, plus individually added items.
+  // What's on screen: scheduled sections, plus sections/items added for today,
+  // either by this person (not yet submitted) or by anyone who has submitted.
+  const sectionAdded = (id: string) => draft.addedSections.includes(id) || id in shared.sections;
+  const itemAdded = (id: string) => draft.addedItems.includes(id) || id in shared.items;
   const visible = sheet
     .map((s) => {
-      const whole = s.scheduled || draft.addedSections.includes(s.id);
-      const items = whole ? s.items : s.items.filter((i) => draft.addedItems.includes(i.id));
-      return { section: s, items, added: !s.scheduled };
+      const whole = s.scheduled || sectionAdded(s.id);
+      const items = whole ? s.items : s.items.filter((i) => itemAdded(i.id));
+      const addedBy = shared.sections[s.id] ?? s.items.map((i) => shared.items[i.id]).find(Boolean);
+      // Only this person's own, not-yet-shared adds can be removed.
+      const removable = !s.scheduled && !(s.id in shared.sections) && !s.items.some((i) => i.id in shared.items);
+      return { section: s, items, added: !s.scheduled, addedBy, removable };
     })
     .filter((v) => v.items.length > 0);
   const visibleIds = new Set(visible.flatMap((v) => v.items.map((i) => i.id)));
-  const notScheduled = sheet.filter((s) => !s.scheduled && !draft.addedSections.includes(s.id));
+  const notScheduled = sheet.filter((s) => !s.scheduled && !sectionAdded(s.id));
 
   const update = (fn: (d: Draft) => Draft) => setDraft((d) => fn(d));
   const entryOf = (d: Draft, id: string): Entry =>
@@ -215,7 +224,7 @@ export function CountForm({
           Nothing is scheduled to be counted today. Add a section or search for an item below.
         </div>
       ) : (
-        visible.map(({ section, items, added }) => {
+        visible.map(({ section, items, added, addedBy, removable }) => {
           const counted = items.filter((i) => !isBlank(entryOf(draft, i.id))).length;
           const changedHere = items.some((i) => isChanged(i.id));
           const isCollapsed = !!collapsed[section.id];
@@ -229,7 +238,11 @@ export function CountForm({
               >
                 <span aria-hidden className="h-3.5 w-3.5 shrink-0 rounded-full" style={{ backgroundColor: section.color }} />
                 <span className="min-w-0 flex-1 truncate text-lg font-bold">{section.name}</span>
-                {added && <span className="rounded-full bg-gold/15 px-2 py-0.5 text-xs font-semibold text-[#6b5830]">Added</span>}
+                {added && (
+                  <span className="shrink-0 rounded-full bg-gold/15 px-2 py-0.5 text-xs font-semibold text-[#6b5830]">
+                    {addedBy ? `Added by ${addedBy}` : "Added"}
+                  </span>
+                )}
                 {section.submittedToday && !changedHere ? (
                   <span className="flex items-center gap-1 text-sm font-semibold text-[#4d7a55]">
                     Submitted
@@ -273,7 +286,7 @@ export function CountForm({
                       />
                     ))}
                   </ul>
-                  {added && (
+                  {added && removable && (
                     <div className="border-t border-ink/10 px-4 py-2 text-right">
                       <button type="button" onClick={() => removeAdded(section.id)} className="h-10 text-sm font-semibold text-ink/55 underline">
                         Remove from today&apos;s count
@@ -289,6 +302,11 @@ export function CountForm({
 
       <form action={formAction} className="flex flex-col items-stretch gap-2 pt-2">
         <input type="hidden" name="lines" value={JSON.stringify(lines)} />
+        <input
+          type="hidden"
+          name="added"
+          value={JSON.stringify({ sections: draft.addedSections, items: draft.addedItems })}
+        />
         <p className="text-center text-sm text-ink/60">
           {lines.length} to submit
           {uncounted > 0 && (

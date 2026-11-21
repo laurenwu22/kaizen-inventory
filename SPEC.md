@@ -44,6 +44,7 @@
 * By default only sections **scheduled for today** are shown. A section is scheduled if today's weekday is in its days-needed list, or today's date is in its extra dates.  
   * Additional sections are shown collapsed and disabled under the save button and have an ‘add’ button  
 * **Adding on the fly:** the employee can add any existing section or individual existing item that is not scheduled today. They cannot create new items or sections (admins only).  
+  * Once submitted, sections and items added on the fly show up for everyone counting at that cafe that day, labeled "Added by [name]". Before submitting, an add only appears on the phone of the person who added it (and only they can remove it).  
   * There should be a search bar with placeholder text ‘search items to add to inventory’
 
 **Counting**
@@ -190,6 +191,7 @@ Each item has one or more rules. Three types:
 * **Item:** id, section, name, unit, active  
 * **QuantityRule:** id, item, type, weekday (only for weekday rules), date (only for date rules), min, max  
 * **Submission:** id, cafe, user, businessDate (LA date), submittedAt (UTC)  
+* **DayAddition:** cafe, businessDate, section or item, addedBy (sections/items added on the fly for a day, shared once submitted)  
 * **SubmissionLine:** submission, item, currentCount (empty when marked Plenty), autoOrder, finalOrder, manuallyEdited, wellStocked (Plenty)
 
 **Derived, not stored:**

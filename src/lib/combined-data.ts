@@ -39,8 +39,8 @@ export async function loadCombinedOrder(cafeId: string, ymd: string): Promise<Co
   );
 }
 
-import type { SubmittedEntry } from "./combined-data-types";
-export type { SubmittedEntry };
+import type { SharedAdditions, SubmittedEntry } from "./combined-data-types";
+export type { SharedAdditions, SubmittedEntry };
 
 /**
  * Today's latest submitted line for each item at the cafe (latest count wins),
@@ -78,4 +78,20 @@ export async function loadLatestEntries(cafeId: string, ymd: string): Promise<Re
       },
     ]),
   );
+}
+
+
+/** Sections and items added (and submitted) for this cafe's count on a day. */
+export async function loadDayAdditions(cafeId: string, ymd: string): Promise<SharedAdditions> {
+  const rows = await prisma.dayAddition.findMany({
+    where: { cafeId, businessDate: dateOnly(ymd) },
+    orderBy: { createdAt: "asc" },
+    select: { sectionId: true, itemId: true, addedBy: { select: { firstName: true } } },
+  });
+  const out: SharedAdditions = { sections: {}, items: {} };
+  for (const r of rows) {
+    if (r.sectionId) out.sections[r.sectionId] ??= r.addedBy.firstName;
+    if (r.itemId) out.items[r.itemId] ??= r.addedBy.firstName;
+  }
+  return out;
 }

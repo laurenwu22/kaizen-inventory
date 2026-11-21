@@ -21,6 +21,11 @@ export type SubmitState = {
   submitted?: { at: string; counted: number };
 };
 
+const addedSchema = z.object({
+  sections: z.array(z.string().min(1).max(64)).max(200).default([]),
+  items: z.array(z.string().min(1).max(64)).max(1000).default([]),
+});
+
 const lineSchema = z.object({
   itemId: z.string().min(1).max(64),
   currentCount: z.string(),
@@ -43,6 +48,13 @@ export async function submitInventory(_prev: SubmitState, fd: FormData): Promise
   const parsed = z.array(lineSchema).max(1000).safeParse(raw);
   if (!parsed.success) return { error: "Your counts couldn't be read. Please try again." };
   const input = parsed.data;
+
+  // Sections/items this person added to today's count (shared once submitted).
+  let added: { sections: string[]; items: string[] } = { sections: [], items: [] };
+  try {
+    const a = addedSchema.safeParse(JSON.parse(String(fd.get("added") ?? "{}")));
+    if (a.success) added = a.data;
+  } catch {}
   if (input.length === 0) return { error: "Enter at least one count before submitting." };
   if (new Set(input.map((l) => l.itemId)).size !== input.length) {
     return { error: "An item was counted twice. Refresh and try again." };
@@ -87,14 +99,31 @@ export async function submitInventory(_prev: SubmitState, fd: FormData): Promise
     });
   }
 
-  const submission = await prisma.submission.create({
-    data: {
-      cafeId,
-      userId: session.user.id,
-      businessDate: dateOnly(today),
-      lines: { createMany: { data: lines } },
-    },
-  });
+  // Only additions that belong to this cafe and are active are recorded.
+  const [okSections, okItems] = await Promise.all([
+    added.sections.length
+      ? prisma.section.findMany({ where: { id: { in: added.sections }, cafeId, active: true }, select: { id: true } })
+      : [],
+    added.items.length
+      ? prisma.item.findMany({
+          where: { id: { in: added.items }, active: true, section: { cafeId, active: true } },
+          select: { id: true },
+        })
+      : [],
+  ]);
+  const businessDate = dateOnly(today);
+  const [submission] = await prisma.$transaction([
+    prisma.submission.create({
+      data: { cafeId, userId: session.user.id, businessDate, lines: { createMany: { data: lines } } },
+    }),
+    prisma.dayAddition.createMany({
+      data: [
+        ...okSections.map((s) => ({ cafeId, businessDate, sectionId: s.id, addedById: session.user.id })),
+        ...okItems.map((i) => ({ cafeId, businessDate, itemId: i.id, addedById: session.user.id })),
+      ],
+      skipDuplicates: true, // someone else already added it today
+    }),
+  ]);
 
   refresh();
   return { submitted: { at: submission.submittedAt.toISOString(), counted: lines.length } };
