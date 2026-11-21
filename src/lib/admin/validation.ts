@@ -12,6 +12,12 @@ export const SECTION_COLORS = [
   { name: "Olive", value: "#8a8a3d" },
   { name: "Rose", value: "#c27c88" },
   { name: "Slate", value: "#5b6670" },
+  { name: "Teal", value: "#3f8a86" },
+  { name: "Sky", value: "#6aa3c8" },
+  { name: "Lavender", value: "#9a88c2" },
+  { name: "Berry", value: "#a63d63" },
+  { name: "Mustard", value: "#d2a32a" },
+  { name: "Coral", value: "#e2795e" },
 ] as const;
 
 const colorValues = SECTION_COLORS.map((c) => c.value) as [string, ...string[]];
