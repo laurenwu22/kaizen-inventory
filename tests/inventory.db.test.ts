@@ -31,6 +31,7 @@ const { Role, RuleType } = await import("@/generated/prisma/client");
 const { signSession } = await import("@/lib/auth/token");
 const { laDateString, weekdayOf } = await import("@/lib/time");
 const { submitInventory } = await import("@/app/(app)/inventory/actions");
+const { loadCombinedOrder } = await import("@/lib/combined-data");
 
 // No "_" or "%" in the tag: Prisma startsWith uses SQL LIKE.
 const tag = `test-inv-${Date.now()}`;
@@ -48,6 +49,10 @@ const submit = async (lines: Line[] | string) => {
     throw e;
   }
 };
+/** The most recent saved line for an item. */
+const latestLine = (itemId: string) =>
+  prisma.submissionLine.findFirstOrThrow({ where: { itemId }, orderBy: { submission: { submittedAt: "desc" } } });
+
 const line = (itemId: string, currentCount: string, over: Partial<Line> = {}): Line => ({
   itemId,
   currentCount,
@@ -108,7 +113,7 @@ describe("submitInventory", () => {
     const r = await submit([line(ids.bananas, "3"), line(ids.milk, "1")]);
     expect(r.result?.submitted?.counted).toBe(2);
     // Bananas today: 3-6, count 3 is at min -> order 3. Milk 0.5-2, count 1 > min -> 0.
-    expect(r.result?.submitted?.toOrder).toEqual([{ section: "Perishables", item: "Bananas", unit: "units", order: 3 }]);
+    expect(Number((await latestLine(ids.milk)).finalOrder)).toBe(0);
     const sub = await prisma.submission.findFirstOrThrow({
       where: { cafeId: ids.cafeA },
       orderBy: { submittedAt: "desc" },
@@ -121,13 +126,13 @@ describe("submitInventory", () => {
   });
 
   it("rounds the automatic order up to a whole number", async () => {
-    const r = await submit([line(ids.milk, "0.5")]); // milk 0.5-2: 2 - 0.5 = 1.5 -> 2
-    expect(r.result?.submitted?.toOrder[0]).toMatchObject({ item: "Milk", order: 2 });
+    await submit([line(ids.milk, "0.5")]); // milk 0.5-2: 2 - 0.5 = 1.5 -> 2
+    expect(Number((await latestLine(ids.milk)).finalOrder)).toBe(2);
   });
 
   it("ignores a tampered order amount unless it's marked as manually edited", async () => {
-    const r = await submit([line(ids.bananas, "1", { finalOrder: "99" })]);
-    expect(r.result?.submitted?.toOrder[0].order).toBe(5); // 6 - 1
+    await submit([line(ids.bananas, "1", { finalOrder: "99" })]);
+    expect(Number((await latestLine(ids.bananas)).finalOrder)).toBe(5); // 6 - 1
   });
 
   it("keeps a manual edit and records it", async () => {
@@ -177,5 +182,23 @@ describe("submitInventory", () => {
     expect((await submit([line(ids.itemB, "1")])).redirect).toBe("/select-cafe");
     cookieValue = saved;
     expect(await prisma.submission.count({ where: { cafeId: ids.cafeB } })).toBe(0);
+  });
+});
+
+describe("loadCombinedOrder", () => {
+  it("merges only this cafe's submissions for that day, latest count winning", async () => {
+    const yesterday = new Date(new Date(`${today}T00:00:00Z`).getTime() - 86400000);
+    // Yesterday at cafe A and today at cafe B must both be ignored.
+    await prisma.submission.create({
+      data: { cafeId: ids.cafeA, userId: ids.employee, businessDate: yesterday, lines: { create: { itemId: ids.milk, currentCount: 0, autoOrder: 2, finalOrder: 7 } } },
+    });
+    await prisma.submission.create({
+      data: { cafeId: ids.cafeB, userId: ids.employee, businessDate: new Date(`${today}T00:00:00Z`), lines: { create: { itemId: ids.itemB, currentCount: 0, autoOrder: 2, finalOrder: 2 } } },
+    });
+    await submit([line(ids.bananas, "1"), line(ids.milk, "5")]); // latest today: bananas 5, milk 0
+    const order = await loadCombinedOrder(ids.cafeA, today);
+    const lines = order.sections.flatMap((s) => s.lines.map((l) => `${l.name}:${l.order}`));
+    expect(lines).toEqual(["Bananas:5"]); // milk's latest count is 0; yesterday's 7 and cafe B ignored
+    expect(order.submissions.every((s) => s.by.startsWith(tag))).toBe(true);
   });
 });

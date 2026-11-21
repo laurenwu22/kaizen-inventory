@@ -66,12 +66,13 @@
 * Merges all of today's submissions into one list of items to order.  
 * If two people counted the same item, the **latest count wins**.  
 * Only items with a to-order amount above 0 are included.  
-* A single **Copy for Slack** button copies the structured text.  
+* A single **Copy for Slack** button copies the structured text (title, date and items; no "Submitted by" line).  
+* The combined order page (from the menu) also lists who submitted and when, and who counted each item.  
+* On the Inventory page, after submitting, the form clears and a **Copy for Slack** button for today's combined order appears below the Submit button (and stays for the rest of the day once anyone has submitted).  
 * Example output:
 
 ```
 Kaizen Inventory Order, Fri 11/20/2026
-Submitted by: Teno, Gabe
 
 PERISHABLES
 - Bananas: 3 bunches

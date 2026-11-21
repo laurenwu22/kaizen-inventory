@@ -10,6 +10,7 @@ import { computeAutoOrder, parseOrder, parseQty, stepCount } from "@/lib/order";
 import { formatQty } from "@/lib/quantity";
 import { formatLaTime } from "@/lib/time";
 import { PendingButton } from "@/components/spinner";
+import { CopyForSlack } from "@/components/copy-for-slack";
 import { ui } from "@/components/ui";
 
 type Draft = {
@@ -39,12 +40,20 @@ function writeDraft(key: string, draft: Draft | null) {
   }
 }
 
-export function CountForm({ sheet, draftKey }: { sheet: CountSection[]; draftKey: string }) {
+export function CountForm({
+  sheet,
+  draftKey,
+  slackText,
+}: {
+  sheet: CountSection[];
+  draftKey: string;
+  /** Today's combined order as Slack text, once anyone has submitted today. */
+  slackText: string | null;
+}) {
   const [state, formAction] = useActionState<SubmitState, FormData>(submitInventory, {});
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [loaded, setLoaded] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [dismissedAt, setDismissedAt] = useState<string | null>(null);
 
   // Sections fully counted in today's submissions start collapsed. When a new
   // submit completes more sections, collapse those too (adjusting state while
@@ -148,10 +157,6 @@ export function CountForm({ sheet, draftKey }: { sheet: CountSection[]; draftKey
     lines.push({ itemId: id, currentCount: raw, finalOrder: orderRaw, manuallyEdited: edited });
   }
 
-  if (state.submitted && state.submitted.at !== dismissedAt) {
-    return <Submitted result={state.submitted} onNewCount={() => setDismissedAt(state.submitted!.at)} />;
-  }
-
   return (
     <div className="flex flex-col gap-4">
       {visible.length === 0 ? (
@@ -244,6 +249,15 @@ export function CountForm({ sheet, draftKey }: { sheet: CountSection[]; draftKey
         <PendingButton className={`${ui.primary} h-14 w-full text-lg`} disabled={lines.length === 0 || invalid.length > 0}>
           Submit
         </PendingButton>
+        {state.submitted && lines.length === 0 && (
+          <p className="flex items-center justify-center gap-1.5 text-sm font-semibold text-[#4d7a55]" role="status">
+            Submitted at {formatLaTime(new Date(state.submitted.at))}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </p>
+        )}
+        {slackText && <CopyForSlack text={slackText} className="mt-1" />}
       </form>
 
       <AddMore sheet={sheet} notScheduled={notScheduled} visibleIds={visibleIds} onAddSection={addSection} onAddItem={addItem} />
@@ -433,59 +447,6 @@ function AddMore({
           </button>
         </div>
       ))}
-    </div>
-  );
-}
-
-function Submitted({
-  result,
-  onNewCount,
-}: {
-  result: NonNullable<SubmitState["submitted"]>;
-  onNewCount: () => void;
-}) {
-  const groups = new Map<string, typeof result.toOrder>();
-  for (const l of result.toOrder) groups.set(l.section, [...(groups.get(l.section) ?? []), l]);
-  return (
-    <div className={`${ui.card} p-6`}>
-      <div className="mb-5 flex items-center gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#e3eee4] text-[#3f6b47]">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </span>
-        <div>
-          <h2 className="text-xl font-bold">Inventory submitted</h2>
-          <p className="text-sm text-ink/60">
-            {formatLaTime(new Date(result.at))} · {result.counted} item{result.counted === 1 ? "" : "s"} counted
-          </p>
-        </div>
-      </div>
-      {result.toOrder.length === 0 ? (
-        <p className="mb-6 text-ink/70">Nothing needs ordering from this count.</p>
-      ) : (
-        <div className="mb-6 flex flex-col gap-4">
-          <h3 className={ui.sectionTitle}>To order</h3>
-          {[...groups].map(([section, items]) => (
-            <div key={section}>
-              <p className="mb-1 font-semibold">{section}</p>
-              <ul className="flex flex-col gap-0.5 text-ink/80">
-                {items.map((l) => (
-                  <li key={l.item} className="flex justify-between gap-3">
-                    <span>{l.item}</span>
-                    <span className="font-semibold">
-                      {formatQty(l.order)} {l.unit}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      )}
-      <button type="button" onClick={onNewCount} className={`${ui.primary} w-full`}>
-        Start a new count
-      </button>
     </div>
   );
 }

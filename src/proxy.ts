@@ -13,7 +13,7 @@ import {
   verifySession,
 } from "@/lib/auth/token";
 
-const PROTECTED_PREFIXES = ["/inventory", "/admin", "/select-cafe"];
+const PROTECTED_PREFIXES = ["/inventory", "/admin", "/select-cafe", "/order"];
 
 export default async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;

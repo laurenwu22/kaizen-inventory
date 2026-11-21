@@ -3,6 +3,8 @@ import { requireUser } from "@/lib/auth/dal";
 import { prisma } from "@/lib/db";
 import { toRule } from "@/lib/admin/data";
 import { buildCountSheet } from "@/lib/inventory";
+import { formatSlack } from "@/lib/combined";
+import { loadCombinedOrder } from "@/lib/combined-data";
 import { dateOnly, dateOnlyString, formatLaDateTime, formatYmd, laDateString } from "@/lib/time";
 import { ContentSpinner } from "@/components/spinner";
 import { CountForm } from "@/components/inventory/count-form";
@@ -14,7 +16,7 @@ async function InventoryHome() {
   const cafeId = session.current.cafeId;
   const today = laDateString();
 
-  const [sections, last, countedLines] = await Promise.all([
+  const [sections, last, countedLines, combined] = await Promise.all([
     prisma.section.findMany({
       where: { cafeId, active: true },
       include: {
@@ -33,6 +35,7 @@ async function InventoryHome() {
       distinct: ["itemId"],
       select: { itemId: true },
     }),
+    loadCombinedOrder(cafeId, today),
   ]);
 
   const sheet = buildCountSheet(
@@ -56,7 +59,11 @@ async function InventoryHome() {
         </p>
       </div>
       {/* Draft key is per user, cafe and day, so drafts never leak between them. */}
-      <CountForm sheet={sheet} draftKey={`kaizen-draft:${session.user.id}:${cafeId}:${today}`} />
+      <CountForm
+        sheet={sheet}
+        draftKey={`kaizen-draft:${session.user.id}:${cafeId}:${today}`}
+        slackText={combined.submissions.length > 0 ? formatSlack(today, combined) : null}
+      />
     </section>
   );
 }

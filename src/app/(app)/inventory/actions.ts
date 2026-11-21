@@ -12,14 +12,13 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth/dal";
 import { toRule } from "@/lib/admin/data";
 import { computeAutoOrder, parseOrder, parseQty } from "@/lib/order";
-import { byPosition, resolveQuantity } from "@/lib/quantity";
+import { resolveQuantity } from "@/lib/quantity";
 import { dateOnly, laDateString } from "@/lib/time";
 
-export type SubmittedLine = { section: string; item: string; unit: string; order: number };
 export type SubmitState = {
   error?: string;
   /** Present after a successful submit. */
-  submitted?: { at: string; counted: number; toOrder: SubmittedLine[] };
+  submitted?: { at: string; counted: number };
 };
 
 const lineSchema = z.object({
@@ -50,7 +49,7 @@ export async function submitInventory(_prev: SubmitState, fd: FormData): Promise
   // Only active items in active sections at the employee's own cafe.
   const items = await prisma.item.findMany({
     where: { id: { in: input.map((l) => l.itemId) }, active: true, section: { cafeId, active: true } },
-    include: { rules: true, section: { select: { name: true, sortOrder: true } } },
+    include: { rules: true },
   });
   if (items.length !== input.length) {
     return { error: "Some items changed since you started. Refresh the page and try again." };
@@ -84,18 +83,6 @@ export async function submitInventory(_prev: SubmitState, fd: FormData): Promise
     },
   });
 
-  const toOrder = lines
-    .filter((l) => l.finalOrder > 0)
-    .map((l) => ({ line: l, item: byId.get(l.itemId)! }))
-    .sort(
-      (a, b) =>
-        byPosition(
-          { sortOrder: a.item.section.sortOrder, name: a.item.section.name },
-          { sortOrder: b.item.section.sortOrder, name: b.item.section.name },
-        ) || byPosition(a.item, b.item),
-    )
-    .map(({ line, item }) => ({ section: item.section.name, item: item.name, unit: item.unit, order: line.finalOrder }));
-
   refresh();
-  return { submitted: { at: submission.submittedAt.toISOString(), counted: lines.length, toOrder } };
+  return { submitted: { at: submission.submittedAt.toISOString(), counted: lines.length } };
 }
