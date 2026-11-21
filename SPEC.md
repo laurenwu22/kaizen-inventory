@@ -91,7 +91,10 @@ MILK
 * Add an employee: first name, last name, PIN (entered manually), and the cafes they belong to with a role at each.  
 * Edit first and last name, PIN, cafe assignments, and role.  
 * Change a users status between employee and admin (per cafe).  
-* Deactivate or reactivate.
+* Deactivate or reactivate. Deactivated people can't sign in at any cafe; their past counts stay in the order history. People are never deleted.  
+* Admins manage the people who work at their selected cafe. They can only add people to, or change roles at, cafes where they are an admin; other cafes are shown read-only.  
+* Any admin at one of a person's cafes can deactivate them, as long as no cafe is left without an active admin.  
+* PINs are hidden (shown as ••••) until an admin taps Show. Each PIN must be unique across all cafes.
 
 **Sections**
 
@@ -256,8 +259,9 @@ Landing Page:
 3. Admin: sections, items, quantity rules  
 4. Employee counting, rule resolution, order calculation, submit  
 5. Combined order view and Slack text  
-6. Order history page: calendar view and item search  
-7. Print today's sheet  
-8. Admin: employee management, then CSV import and export  
-9. Mobile polish and real-world testing at the cafe
+6. Admin: employee management  
+7. Order history page: calendar view and item search  
+8. Print today's sheet  
+9. Admin: CSV import and export  
+10. Mobile polish and real-world testing at the cafe
 
