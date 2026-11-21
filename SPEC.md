@@ -59,6 +59,9 @@
 **Submitting**
 
 * A **Submit** button saves everything to the database as one submission.  
+* Items left blank are not included; the Submit area shows how many items weren't counted.  
+* Counts entered but not yet submitted are kept on that phone (per user, cafe and day) so a reload or locked screen doesn't lose them.  
+* The server recalculates the automatic to-order amount from that day's rules; only amounts the employee edited are taken as entered.  
 * **Combined order view (per cafe, per day)**  
 * Merges all of today's submissions into one list of items to order.  
 * If two people counted the same item, the **latest count wins**.  

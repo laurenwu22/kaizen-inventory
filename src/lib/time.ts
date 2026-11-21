@@ -54,3 +54,23 @@ const longDate = new Intl.DateTimeFormat("en-US", {
 export function formatYmd(ymd: string): string {
   return longDate.format(dateOnly(ymd));
 }
+
+const laDateTime = new Intl.DateTimeFormat("en-US", {
+  timeZone: TIME_ZONE,
+  weekday: "short",
+  month: "numeric",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+const laTime = new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, hour: "numeric", minute: "2-digit" });
+
+/** An instant shown in LA time, e.g. "Fri, 11/20, 9:14 AM". */
+export function formatLaDateTime(instant: Date): string {
+  return laDateTime.format(instant);
+}
+
+/** An instant's LA clock time, e.g. "9:14 AM". */
+export function formatLaTime(instant: Date): string {
+  return laTime.format(instant);
+}
