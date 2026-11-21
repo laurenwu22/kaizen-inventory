@@ -1,0 +1,144 @@
+// Seeds the cafes and the first admin. Safe to run repeatedly.
+//
+//   npx prisma db seed                 cafes + first admin
+//   npx prisma db seed -- --sample     also adds sample sections/items/rules
+//
+// Requires SEED_ADMIN_PIN in .env (never commit it). SEED_ADMIN_NAME is optional.
+import "dotenv/config";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient, Role, RuleType } from "../src/generated/prisma/client";
+
+const CAFES = ["Kaizen Flagship", "Kaizen Commons", "Luma"];
+
+const connectionString = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
+if (!connectionString) throw new Error("DATABASE_URL is not set");
+const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+
+async function seedCafesAndAdmin() {
+  const adminName = process.env.SEED_ADMIN_NAME?.trim() || "Lauren Wu";
+  const adminPin = process.env.SEED_ADMIN_PIN?.trim();
+  if (!adminPin || !/^\d{4,8}$/.test(adminPin)) {
+    throw new Error("Set SEED_ADMIN_PIN in .env to a 4-8 digit PIN");
+  }
+
+  const cafes = [];
+  for (const name of CAFES) {
+    cafes.push(await prisma.cafe.upsert({ where: { name }, update: {}, create: { name } }));
+  }
+
+  const existing = await prisma.user.findUnique({ where: { pin: adminPin } });
+  if (existing && existing.name !== adminName) {
+    throw new Error(`PIN already belongs to "${existing.name}". Pick another SEED_ADMIN_PIN.`);
+  }
+  const admin = await prisma.user.upsert({
+    where: { pin: adminPin },
+    update: { active: true },
+    create: { name: adminName, pin: adminPin },
+  });
+
+  for (const cafe of cafes) {
+    await prisma.userCafe.upsert({
+      where: { userId_cafeId: { userId: admin.id, cafeId: cafe.id } },
+      update: { role: Role.ADMIN },
+      create: { userId: admin.id, cafeId: cafe.id, role: Role.ADMIN },
+    });
+  }
+
+  console.log(`Cafes: ${cafes.map((c) => c.name).join(", ")}`);
+  console.log(`Admin: ${admin.name} (ADMIN at all ${cafes.length} cafes)`);
+  return cafes;
+}
+
+type SampleItem = {
+  name: string;
+  unit: string;
+  min: number;
+  max: number;
+  weekdays?: { days: number[]; min: number; max: number };
+  date?: { date: string; min: number; max: number };
+};
+
+const SAMPLE: { name: string; color: string; days: number[]; items: SampleItem[] }[] = [
+  {
+    name: "Perishables",
+    color: "#4f9d69",
+    days: [1, 3, 5], // Mon, Wed, Fri
+    items: [
+      {
+        name: "Bananas",
+        unit: "bunch",
+        min: 2,
+        max: 4,
+        weekdays: { days: [5, 6, 0], min: 3, max: 6 }, // Fri-Sun
+        date: { date: "2027-02-13", min: 5, max: 5 },
+      },
+      { name: "Cucumber", unit: "gallon", min: 1, max: 3 },
+    ],
+  },
+  {
+    name: "Milk",
+    color: "#3b82f6",
+    days: [0, 1, 2, 3, 4, 5, 6],
+    items: [
+      { name: "Whole", unit: "gallon", min: 10, max: 30 },
+      { name: "Oat", unit: "carton", min: 6, max: 18 },
+    ],
+  },
+];
+
+async function seedSample(cafeId: string) {
+  for (const [i, s] of SAMPLE.entries()) {
+    const section = await prisma.section.upsert({
+      where: { cafeId_name: { cafeId, name: s.name } },
+      update: {},
+      create: { cafeId, name: s.name, color: s.color, daysOfWeek: s.days, sortOrder: i },
+    });
+    for (const [j, it] of s.items.entries()) {
+      const item = await prisma.item.upsert({
+        where: { sectionId_name: { sectionId: section.id, name: it.name } },
+        update: {},
+        create: { sectionId: section.id, name: it.name, unit: it.unit, sortOrder: j },
+      });
+      // Only create rules for new items so re-running doesn't fight admin edits.
+      if ((await prisma.quantityRule.count({ where: { itemId: item.id } })) > 0) continue;
+      await prisma.quantityRule.create({
+        data: { itemId: item.id, type: RuleType.DEFAULT, min: it.min, max: it.max },
+      });
+      for (const weekday of it.weekdays?.days ?? []) {
+        await prisma.quantityRule.create({
+          data: {
+            itemId: item.id,
+            type: RuleType.WEEKDAY,
+            weekday,
+            min: it.weekdays!.min,
+            max: it.weekdays!.max,
+          },
+        });
+      }
+      if (it.date) {
+        await prisma.quantityRule.create({
+          data: {
+            itemId: item.id,
+            type: RuleType.DATE,
+            date: new Date(`${it.date.date}T00:00:00.000Z`),
+            min: it.date.min,
+            max: it.date.max,
+          },
+        });
+      }
+    }
+  }
+  console.log("Sample sections and items added to the first cafe.");
+}
+
+async function main() {
+  const cafes = await seedCafesAndAdmin();
+  if (process.argv.includes("--sample")) await seedSample(cafes[0].id);
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exitCode = 1;
+  })
+  .finally(() => prisma.$disconnect());

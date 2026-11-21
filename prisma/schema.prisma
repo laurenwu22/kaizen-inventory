@@ -1,0 +1,166 @@
+// Kaizen Inventory data model. See SPEC.md "Data Model".
+//
+// Conventions:
+// - All timestamps are stored in UTC (timestamptz).
+// - Calendar dates (business dates, extra section dates, date rules) are
+//   America/Los_Angeles dates stored as Postgres DATE with no time zone.
+// - Weekdays are 0-6, Sunday = 0 (matches JS Date#getDay).
+// - Nothing that carries history is ever deleted: users, sections and items
+//   are deactivated via `active`.
+//
+// Some integrity rules can't be expressed in Prisma schema language and live
+// in hand-written SQL in the migrations (CHECK constraints, NULLS NOT DISTINCT).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  EMPLOYEE
+  ADMIN
+}
+
+enum RuleType {
+  DEFAULT
+  WEEKDAY
+  DATE
+}
+
+model Cafe {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
+  members     UserCafe[]
+  sections    Section[]
+  submissions Submission[]
+}
+
+model User {
+  id          String       @id @default(cuid())
+  name        String
+  /// Matches the person's Toast PIN. String so leading zeros are kept.
+  /// Unique across all cafes.
+  pin         String       @unique
+  active      Boolean      @default(true)
+  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime     @updatedAt @db.Timestamptz(3)
+  cafes       UserCafe[]
+  submissions Submission[]
+}
+
+/// Membership of a user at a cafe. Admin status is per cafe.
+model UserCafe {
+  userId    String
+  cafeId    String
+  role      Role     @default(EMPLOYEE)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  cafe      Cafe     @relation(fields: [cafeId], references: [id], onDelete: Restrict)
+
+  @@id([userId, cafeId])
+  @@index([cafeId])
+}
+
+model Section {
+  id         String             @id @default(cuid())
+  cafeId     String
+  name       String
+  /// Weekdays this section is counted, 0-6 (Sunday = 0).
+  daysOfWeek Int[]              @default([])
+  /// Hex color used for the order-history calendar dots, e.g. "#4f9d69".
+  color      String             @default("#6b7280")
+  sortOrder  Int                @default(0)
+  active     Boolean            @default(true)
+  createdAt  DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime           @updatedAt @db.Timestamptz(3)
+  cafe       Cafe               @relation(fields: [cafeId], references: [id], onDelete: Restrict)
+  extraDates SectionExtraDate[]
+  items      Item[]
+
+  @@unique([cafeId, name])
+}
+
+/// One-time extra dates a section is counted (LA calendar date).
+model SectionExtraDate {
+  sectionId String
+  date      DateTime @db.Date
+  section   Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@id([sectionId, date])
+}
+
+model Item {
+  id        String           @id @default(cuid())
+  sectionId String
+  name      String
+  /// A single fixed label, e.g. "bunch".
+  unit      String
+  sortOrder Int              @default(0)
+  active    Boolean          @default(true)
+  createdAt DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime         @updatedAt @db.Timestamptz(3)
+  section   Section          @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  rules     QuantityRule[]
+  lines     SubmissionLine[]
+
+  // CSV import matches on (section name, item name).
+  @@unique([sectionId, name])
+}
+
+/// Min/max for an item. Resolution for a given day: DATE, then WEEKDAY, then DEFAULT.
+///
+/// Enforced in SQL (see migrations):
+/// - DEFAULT has weekday and date NULL; WEEKDAY has weekday 0-6 and date NULL;
+///   DATE has date set and weekday NULL.
+/// - 0 <= min <= max.
+/// - The unique index below is NULLS NOT DISTINCT, giving one DEFAULT, one rule
+///   per weekday and one rule per date for each item.
+model QuantityRule {
+  id        String    @id @default(cuid())
+  itemId    String
+  type      RuleType
+  weekday   Int?
+  date      DateTime? @db.Date
+  min       Decimal   @db.Decimal(10, 2)
+  max       Decimal   @db.Decimal(10, 2)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+  item      Item      @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([itemId, type, weekday, date])
+}
+
+model Submission {
+  id           String           @id @default(cuid())
+  cafeId       String
+  userId       String
+  /// The LA calendar date this count belongs to.
+  businessDate DateTime         @db.Date
+  submittedAt  DateTime         @default(now()) @db.Timestamptz(3)
+  cafe         Cafe             @relation(fields: [cafeId], references: [id], onDelete: Restrict)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  lines        SubmissionLine[]
+
+  @@index([cafeId, businessDate])
+  @@index([cafeId, submittedAt])
+}
+
+model SubmissionLine {
+  id             String     @id @default(cuid())
+  submissionId   String
+  itemId         String
+  currentCount   Decimal    @db.Decimal(10, 2)
+  autoOrder      Decimal    @db.Decimal(10, 2)
+  finalOrder     Decimal    @db.Decimal(10, 2)
+  manuallyEdited Boolean    @default(false)
+  submission     Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  item           Item       @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([submissionId, itemId])
+  @@index([itemId])
+}
