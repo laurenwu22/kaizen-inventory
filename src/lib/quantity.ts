@@ -60,6 +60,11 @@ export function compareNames(a: string, b: string): number {
   return a.localeCompare(b, "en", { sensitivity: "base", numeric: true });
 }
 
+/** Display order for sections and items: their saved position, then name. */
+export function byPosition<T extends { sortOrder: number; name: string }>(a: T, b: T): number {
+  return a.sortOrder - b.sortOrder || compareNames(a.name, b.name);
+}
+
 /** 2 -> "2", 0.5 -> "0.5", 2.25 -> "2.25". */
 export function formatQty(n: number): string {
   return Number.isInteger(n) ? String(n) : String(Number(n.toFixed(2)));

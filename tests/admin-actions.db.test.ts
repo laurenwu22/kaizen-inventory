@@ -205,6 +205,24 @@ describe("admin at cafe A", () => {
     expect(rules.filter((x) => x.type === "DATE")).toHaveLength(1);
   });
 
+  it("adds new items at the bottom and reorders items", async () => {
+    await run(() => actions.createItem(sectionId, {}, itemFd({ name: "Apples" })));
+    await run(() => actions.createItem(sectionId, {}, itemFd({ name: "Zucchini" })));
+    const order = async () =>
+      (await prisma.item.findMany({ where: { sectionId }, orderBy: { sortOrder: "asc" } })).map((i) => i.name);
+    expect(await order()).toEqual(["Bananas", "Apples", "Zucchini"]); // not alphabetical: newest last
+    const zucchini = await prisma.item.findFirstOrThrow({ where: { sectionId, name: "Zucchini" } });
+    await run(() => actions.moveItem(fd({ itemId: zucchini.id, direction: "up" })));
+    expect(await order()).toEqual(["Bananas", "Zucchini", "Apples"]);
+    await run(() => actions.moveItem(fd({ itemId: zucchini.id, direction: "up" })));
+    await run(() => actions.moveItem(fd({ itemId: zucchini.id, direction: "up" }))); // already first: no change
+    expect(await order()).toEqual(["Zucchini", "Bananas", "Apples"]);
+    for (const name of ["Apples", "Zucchini"]) {
+      const it = await prisma.item.findFirstOrThrow({ where: { sectionId, name } });
+      await run(() => actions.deleteItem(it.id));
+    }
+  });
+
   it("rejects a duplicate item name in the same section", async () => {
     const r = await run(() => actions.createItem(sectionId, {}, itemFd()));
     expect(r.result?.fieldErrors?.name).toMatch(/already has/);
@@ -274,6 +292,7 @@ describe("admin at cafe A", () => {
       () => actions.createItem(ids.sectionB, {}, fd({ name: "X", unit: "box", min: "1", max: "2", weekdays: "[]", dates: "[]" })),
       () => actions.updateItem(ids.itemB, {}, fd({ name: "Hacked", unit: "box", min: "1", max: "2", weekdays: "[]", dates: "[]" })),
       () => actions.deleteItem(ids.itemB),
+      () => actions.moveItem(fd({ itemId: ids.itemB, direction: "up" })),
     ];
     for (const attempt of attempts) expect((await run(attempt)).notFound).toBe(true);
     const sectionB = await prisma.section.findUniqueOrThrow({ where: { id: ids.sectionB } });

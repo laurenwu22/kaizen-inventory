@@ -1,14 +1,14 @@
 import { Suspense } from "react";
 import { ContentSpinner, PendingButton } from "@/components/spinner";
-import { SectionList } from "@/components/admin/section-list";
+import { ReorderList } from "@/components/admin/reorder-list";
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth/dal";
 import { prisma } from "@/lib/db";
-import { describeDays } from "@/lib/quantity";
+import { byPosition, describeDays } from "@/lib/quantity";
 import { laDateString } from "@/lib/time";
 import { ColorDot, PageTitle } from "@/components/admin/admin-chrome";
 import { ui } from "@/components/ui";
-import { setSectionActive } from "./actions";
+import { moveSection, setSectionActive } from "./actions";
 
 // Admin > Sections: every section at the selected cafe, in employee order.
 
@@ -17,12 +17,12 @@ async function SectionsAdmin() {
   const today = new Date(`${laDateString()}T00:00:00Z`);
   const sections = await prisma.section.findMany({
     where: { cafeId: session.current.cafeId },
-    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     include: {
       _count: { select: { items: { where: { active: true } } } },
       extraDates: { where: { date: { gte: today } }, select: { date: true } },
     },
   });
+  sections.sort(byPosition);
   const active = sections.filter((s) => s.active);
   const inactive = sections.filter((s) => !s.active);
 
@@ -43,18 +43,32 @@ async function SectionsAdmin() {
           No sections yet. Add one, such as Perishables or Milk, then add the items to count in it.
         </div>
       ) : (
-        <SectionList
-          sections={active.map((s) => ({
+        <ReorderList
+          moveAction={moveSection}
+          idField="sectionId"
+          rows={active.map((s) => ({
             id: s.id,
             name: s.name,
-            color: s.color,
-            subtitle: [
-              describeDays(s.daysOfWeek),
-              s.extraDates.length > 0 ? `+${s.extraDates.length} date${s.extraDates.length > 1 ? "s" : ""}` : null,
-              `${s._count.items} item${s._count.items === 1 ? "" : "s"}`,
-            ]
-              .filter(Boolean)
-              .join(" · "),
+            href: `/admin/sections/${s.id}`,
+            content: (
+              <span className="flex items-center gap-3">
+                <ColorDot color={s.color} size={14} />
+                <span className="min-w-0">
+                  <span className="block truncate font-semibold">{s.name}</span>
+                  <span className="block truncate text-sm text-ink/60">
+                    {[
+                      describeDays(s.daysOfWeek),
+                      s.extraDates.length > 0
+                        ? `+${s.extraDates.length} date${s.extraDates.length > 1 ? "s" : ""}`
+                        : null,
+                      `${s._count.items} item${s._count.items === 1 ? "" : "s"}`,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                </span>
+              </span>
+            ),
           }))}
         />
       )}

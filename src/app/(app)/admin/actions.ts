@@ -20,6 +20,7 @@ import {
   type ItemInput,
 } from "@/lib/admin/validation";
 import { dateOnly, laDateString } from "@/lib/time";
+import { byPosition } from "@/lib/quantity";
 import { Prisma, RuleType } from "@/generated/prisma/client";
 
 const str = (fd: FormData, key: string) => String(fd.get(key) ?? "");
@@ -96,9 +97,9 @@ export async function moveSection(fd: FormData): Promise<void> {
   const section = await getOwnedSection(current.cafeId, str(fd, "sectionId"));
   const siblings = await prisma.section.findMany({
     where: { cafeId: current.cafeId, active: section.active },
-    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-    select: { id: true },
+    select: { id: true, sortOrder: true, name: true },
   });
+  siblings.sort(byPosition);
   const order = reorder(siblings.map((s) => s.id), section.id, str(fd, "direction") === "up" ? "up" : "down");
   if (!order) return;
   await prisma.$transaction(order.map((id, sortOrder) => prisma.section.update({ where: { id }, data: { sortOrder } })));
@@ -159,7 +160,11 @@ export async function createItem(sectionId: string, _prev: FormState, fd: FormDa
 
   try {
     await prisma.$transaction(async (tx) => {
-      const item = await tx.item.create({ data: { sectionId, name: data.name, unit: data.unit } });
+      // New items go to the bottom of the section.
+      const last = await tx.item.aggregate({ where: { sectionId }, _max: { sortOrder: true } });
+      const item = await tx.item.create({
+        data: { sectionId, name: data.name, unit: data.unit, sortOrder: (last._max.sortOrder ?? -1) + 1 },
+      });
       await tx.quantityRule.createMany({ data: ruleRows(item.id, data) });
     });
   } catch (e) {
@@ -223,4 +228,18 @@ export async function deleteItem(itemId: string): Promise<FormState> {
     prisma.item.delete({ where: { id: item.id } }),
   ]);
   redirect(`/admin/sections/${item.sectionId}`);
+}
+
+export async function moveItem(fd: FormData): Promise<void> {
+  const { current } = await requireAdmin();
+  const item = await getOwnedItem(current.cafeId, str(fd, "itemId"));
+  const siblings = await prisma.item.findMany({
+    where: { sectionId: item.sectionId, active: true },
+    select: { id: true, sortOrder: true, name: true },
+  });
+  siblings.sort(byPosition);
+  const order = reorder(siblings.map((s) => s.id), item.id, str(fd, "direction") === "up" ? "up" : "down");
+  if (!order) return;
+  await prisma.$transaction(order.map((id, sortOrder) => prisma.item.update({ where: { id }, data: { sortOrder } })));
+  refresh();
 }

@@ -1,17 +1,17 @@
 import { Suspense } from "react";
-import { ContentSpinner, LinkSpinner, PendingButton } from "@/components/spinner";
-import Link from "next/link";
+import { ContentSpinner, PendingButton } from "@/components/spinner";
+import { ReorderList } from "@/components/admin/reorder-list";
 import { requireAdmin } from "@/lib/auth/dal";
 import { prisma } from "@/lib/db";
 import { cafeUnits, getOwnedSection, toRule } from "@/lib/admin/data";
-import { compareNames, formatQty, WEEKDAY_SHORT } from "@/lib/quantity";
+import { byPosition, formatQty, WEEKDAY_SHORT } from "@/lib/quantity";
 import { dateOnlyString, formatYmd, laDateString } from "@/lib/time";
 import { BackLink, Card, ColorDot, PageTitle } from "@/components/admin/admin-chrome";
 import { ConfirmSubmit } from "@/components/admin/form-bits";
 import { ExtraDateForm, SectionForm } from "@/components/admin/forms";
 import { ui } from "@/components/ui";
 import { AddItemModal } from "@/components/admin/add-item-modal";
-import { addExtraDate, createItem, removeExtraDate, setSectionActive, updateSection } from "../../actions";
+import { addExtraDate, createItem, moveItem, removeExtraDate, setSectionActive, updateSection } from "../../actions";
 
 async function SectionAdmin({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireAdmin();
@@ -30,8 +30,8 @@ async function SectionAdmin({ params }: { params: Promise<{ id: string }> }) {
     }),
     cafeUnits(session.current.cafeId),
   ]);
-  // Items are always listed alphabetically.
-  const activeItems = items.filter((i) => i.active).sort((a, b) => compareNames(a.name, b.name));
+  // Items are listed in their saved order; new items are added at the bottom.
+  const activeItems = items.filter((i) => i.active).sort(byPosition);
 
   return (
     <>
@@ -59,19 +59,21 @@ async function SectionAdmin({ params }: { params: Promise<{ id: string }> }) {
           {activeItems.length === 0 ? (
             <p className="text-ink/60">No items yet.</p>
           ) : (
-            <ul className="-mx-2 flex flex-col">
-              {activeItems.map((item) => {
+            <ReorderList
+              variant="rows"
+              moveAction={moveItem}
+              idField="itemId"
+              rows={activeItems.map((item) => {
                 const rules = item.rules.map(toRule);
                 const def = rules.find((r) => r.type === "DEFAULT");
                 const weekdayDays = rules.filter((r) => r.type === "WEEKDAY").map((r) => r.weekday!);
                 const upcomingDates = rules.filter((r) => r.type === "DATE" && r.date! >= today);
-                return (
-                  <li key={item.id} className="flex items-center gap-2 rounded-xl px-2 py-1.5">
-                    <Link
-                      href={`/admin/items/${item.id}`}
-                      className="flex min-w-0 flex-1 items-center gap-3 rounded-xl py-1.5 active:bg-cream"
-                    >
-                      <span className="min-w-0 flex-1">
+                return {
+                  id: item.id,
+                  name: item.name,
+                  href: `/admin/items/${item.id}`,
+                  content: (
+                    <>
                       <span className="block truncate font-semibold">{item.name}</span>
                       <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink/60">
                         <span>
@@ -81,7 +83,10 @@ async function SectionAdmin({ params }: { params: Promise<{ id: string }> }) {
                           <Badge>
                             {weekdayDays.length === 7
                               ? "Custom every day"
-                              : `Custom: ${weekdayDays.sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map((d) => WEEKDAY_SHORT[d]).join(", ")}`}
+                              : `Custom: ${weekdayDays
+                                  .sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7))
+                                  .map((d) => WEEKDAY_SHORT[d])
+                                  .join(", ")}`}
                           </Badge>
                         )}
                         {upcomingDates.length > 0 && (
@@ -91,15 +96,12 @@ async function SectionAdmin({ params }: { params: Promise<{ id: string }> }) {
                         )}
                         {!def && <Badge tone="warn">Needs default</Badge>}
                       </span>
-                      </span>
-                      <LinkSpinner />
-                    </Link>
-                  </li>
-                );
+                    </>
+                  ),
+                };
               })}
-            </ul>
+            />
           )}
-
         </div>
 
         <Card title="Section details">
