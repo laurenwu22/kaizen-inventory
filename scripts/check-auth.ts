@@ -88,7 +88,7 @@ async function main() {
     check("employee: /inventory renders", r.status === 200 && !r.redirectTo && r.body.includes("Welcome back"), `got ${r.status} ${r.redirectTo}`);
     check("employee: no Admin tab", !r.body.includes('href="/admin"'));
     r = await visit("/admin", good);
-    check("employee: /admin refused -> /inventory", r.redirectTo === "/inventory" && !r.body.includes("Admin tools for"), `got ${r.status} ${r.redirectTo}`);
+    check("employee: /admin refused -> /inventory", r.redirectTo === "/inventory" && !r.body.includes("+ Add section"), `got ${r.status} ${r.redirectTo}`);
     r = await visit("/", good);
     check("employee: / -> /inventory when signed in", r.redirectTo === "/inventory", `got ${r.status} ${r.redirectTo}`);
 
@@ -98,15 +98,27 @@ async function main() {
 
     // Admin is per cafe
     r = await visit("/admin", await tok(admin.id, cafeA.id));
-    check("admin at A: /admin renders", r.status === 200 && !r.redirectTo && r.body.includes("Admin tools for"), `got ${r.status} ${r.redirectTo}`);
+    check("admin at A: /admin renders", r.status === 200 && !r.redirectTo && r.body.includes("+ Add section"), `got ${r.status} ${r.redirectTo}`);
     r = await visit("/inventory", await tok(admin.id, cafeA.id));
     check("admin at A: Admin tab shown", r.body.includes('href="/admin"'));
     r = await visit("/admin", await tok(admin.id, cafeB.id));
-    check("admin at A but employee at B: /admin at B refused", r.redirectTo === "/inventory" && !r.body.includes("Admin tools for"), `got ${r.status} ${r.redirectTo}`);
+    check("admin at A but employee at B: /admin at B refused", r.redirectTo === "/inventory" && !r.body.includes("+ Add section"), `got ${r.status} ${r.redirectTo}`);
     r = await visit("/select-cafe", await tok(admin.id, null));
     check("multi-cafe user: /select-cafe lists both cafes", r.body.includes(cafeA.name) && r.body.includes(cafeB.name));
 
-    // Deactivation and demotion apply immediately to existing sessions
+    // Admin sub-pages
+    const sectionA = await prisma.section.create({ data: { cafeId: cafeA.id, name: "Check A" } });
+    const sectionB = await prisma.section.create({ data: { cafeId: cafeB.id, name: "Check B" } });
+    r = await visit("/admin/sections/new", good);
+    check("employee: /admin/sections/new refused", r.redirectTo === "/inventory", `got ${r.status} ${r.redirectTo}`);
+    r = await visit(`/admin/sections/${sectionA.id}`, good);
+    check("employee: section page refused", r.redirectTo === "/inventory" && !r.body.includes("Check A"), `got ${r.status} ${r.redirectTo}`);
+    r = await visit(`/admin/sections/${sectionA.id}`, await tok(admin.id, cafeA.id));
+    check("admin at A: own section page renders", r.status === 200 && r.body.includes("Check A"), `got ${r.status} ${r.redirectTo}`);
+    r = await visit(`/admin/sections/${sectionB.id}`, await tok(admin.id, cafeA.id));
+    check("admin at A: cafe B's section page is not found", !r.body.includes("Check B") && (r.status === 404 || r.body.includes("NEXT_HTTP_ERROR_FALLBACK;404") || r.body.includes("could not be found")), `got ${r.status}`);
+
+
     r = await visit("/inventory", await tok(inactive.id, cafeA.id));
     check("deactivated user's session -> /", r.redirectTo === "/", `got ${r.status} ${r.redirectTo}`);
     await prisma.userCafe.update({
@@ -133,6 +145,7 @@ async function main() {
     check("rate limit: success resets the IP's failures", (await checkRateLimit(testIp)).allowed);
   } finally {
     await prisma.loginAttempt.deleteMany({ where: { ip: testIp } });
+    await prisma.section.deleteMany({ where: { cafeId: { in: [cafeA.id, cafeB.id] } } });
     await prisma.userCafe.deleteMany({ where: { cafeId: { in: [cafeA.id, cafeB.id] } } });
     await prisma.user.deleteMany({ where: { id: { in: [employee.id, admin.id, inactive.id] } } });
     await prisma.cafe.deleteMany({ where: { id: { in: [cafeA.id, cafeB.id] } } });

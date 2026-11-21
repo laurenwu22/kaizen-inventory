@@ -65,7 +65,7 @@ type SampleItem = {
 const SAMPLE: { name: string; color: string; days: number[]; items: SampleItem[] }[] = [
   {
     name: "Perishables",
-    color: "#4f9d69",
+    color: "#6b8f71",
     days: [1, 3, 5], // Mon, Wed, Fri
     items: [
       {
@@ -77,15 +77,27 @@ const SAMPLE: { name: string; color: string; days: number[]; items: SampleItem[]
         date: { date: "2027-02-13", min: 5, max: 5 },
       },
       { name: "Cucumber", unit: "gallon", min: 1, max: 3 },
+      { name: "Lemons", unit: "bag", min: 1, max: 2 },
+      { name: "Mint", unit: "bunch", min: 0.5, max: 2 },
+    ],
+  },
+  {
+    name: "Sauce Ingredients",
+    color: "#b8694a",
+    days: [1, 4], // Mon, Thu
+    items: [
+      { name: "Brown sugar", unit: "bag", min: 1, max: 3 },
+      { name: "Vanilla extract", unit: "bottle", min: 1, max: 2 },
     ],
   },
   {
     name: "Milk",
-    color: "#3b82f6",
+    color: "#4f7896",
     days: [0, 1, 2, 3, 4, 5, 6],
     items: [
       { name: "Whole", unit: "gallon", min: 10, max: 30 },
       { name: "Oat", unit: "carton", min: 6, max: 18 },
+      { name: "Almond", unit: "carton", min: 2, max: 6 },
     ],
   },
 ];

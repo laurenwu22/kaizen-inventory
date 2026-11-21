@@ -41,3 +41,16 @@ export function todayBusinessDate(now: Date = new Date()): Date {
 export function weekdayOf(ymd: string): number {
   return dateOnly(ymd).getUTCDay();
 }
+
+const longDate = new Intl.DateTimeFormat("en-US", {
+  timeZone: "UTC",
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
+
+/** "2027-02-13" -> "Sat, Feb 13, 2027" */
+export function formatYmd(ymd: string): string {
+  return longDate.format(dateOnly(ymd));
+}
