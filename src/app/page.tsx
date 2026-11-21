@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/dal";
 import { PinPad } from "./pin-pad";
@@ -15,7 +16,8 @@ async function RedirectIfSignedIn() {
 export default function Home() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-6 py-10">
-      <h1 className="mb-8 text-2xl font-semibold tracking-tight">Kaizen Inventory</h1>
+      <Image src="/logo.png" alt="" width={112} height={113} priority className="mb-4" />
+      <h1 className="mb-8 text-xs font-semibold uppercase tracking-[0.2em] text-gold">Kaizen Inventory</h1>
       <Suspense fallback={null}>
         <RedirectIfSignedIn />
       </Suspense>

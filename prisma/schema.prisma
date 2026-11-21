@@ -42,7 +42,9 @@ model Cafe {
 
 model User {
   id          String       @id @default(cuid())
-  name        String
+  /// Used in greetings ("Welcome back, Maria") and Slack "Submitted by".
+  firstName   String
+  lastName    String
   /// Matches the person's Toast PIN. String so leading zeros are kept.
   /// Unique across all cafes.
   pin         String       @unique

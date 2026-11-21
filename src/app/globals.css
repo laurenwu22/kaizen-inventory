@@ -1,20 +1,33 @@
 @import "tailwindcss";
 
-:root {
-  --background: #fafaf9;
-  --foreground: #1c1917;
-}
-
+/*
+ * Kaizen & Coffee brand, taken from kaizenandcoffee.com:
+ * Inter, warm near-black ink on sand, white cards, muted gold accent.
+ * Use these tokens (bg-sand, text-ink, ring-ink/10, bg-gold, ...) instead of
+ * raw Tailwind grays so the app stays on-brand.
+ */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-ink: #23211e;
+  --color-ink-hover: #4c4841;
+  --color-sand: #e5ded2;
+  --color-cream: #f2eee5;
+  --color-paper: #ffffff;
+  --color-gold: #b09458;
+  --color-gold-soft: #c0aa7b;
+
+  --color-background: var(--color-sand);
+  --color-foreground: var(--color-ink);
+  --font-sans: var(--font-inter), Arial, sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  background: var(--color-sand);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
   -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
 }

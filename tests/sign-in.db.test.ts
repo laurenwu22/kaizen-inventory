@@ -72,14 +72,14 @@ beforeAll(async () => {
     ["A", "B", "C"].map((n) => prisma.cafe.create({ data: { name: `${tag}_${n}` } })),
   );
   const one = await prisma.user.create({
-    data: { name: `${tag}_one`, pin: pin3, cafes: { create: { cafeId: cafeA.id, role: Role.EMPLOYEE } } },
+    data: { firstName: `${tag}_one`, lastName: "Test", pin: pin3, cafes: { create: { cafeId: cafeA.id, role: Role.EMPLOYEE } } },
   });
   oneCafeUserId = one.id;
   await prisma.user.create({
-    data: { name: `${tag}_two`, pin: pin4, cafes: { create: [{ cafeId: cafeA.id }, { cafeId: cafeB.id }] } },
+    data: { firstName: `${tag}_two`, lastName: "Test", pin: pin4, cafes: { create: [{ cafeId: cafeA.id }, { cafeId: cafeB.id }] } },
   });
   await prisma.user.create({
-    data: { name: `${tag}_off`, pin: pinInactive, active: false, cafes: { create: { cafeId: cafeA.id } } },
+    data: { firstName: `${tag}_off`, lastName: "Test", pin: pinInactive, active: false, cafes: { create: { cafeId: cafeA.id } } },
   });
 });
 
@@ -87,7 +87,7 @@ afterAll(async () => {
   await prisma.loginAttempt.deleteMany({ where: { ip: { startsWith: tag } } });
   const cafeIds = [cafeA, cafeB, cafeC].filter(Boolean).map((c) => c.id);
   await prisma.userCafe.deleteMany({ where: { cafeId: { in: cafeIds } } });
-  await prisma.user.deleteMany({ where: { name: { startsWith: tag } } });
+  await prisma.user.deleteMany({ where: { firstName: { startsWith: tag } } });
   await prisma.cafe.deleteMany({ where: { id: { in: cafeIds } } });
   await prisma.$disconnect();
 });

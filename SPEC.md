@@ -33,7 +33,7 @@
 
 **Header**
 
-* Greeting: *Welcome back, \[name\]*  
+* Greeting: *Welcome back, \[first name\]*  
 * Current cafe, with a dropdown switcher if the user has more than one  
 * *Inventory last updated \[date/time\] by \[name\]* for the selected cafe, derived from the most recent submission  
 * Hamburger menu at top: **Create PDF** and **View today's combined order**
@@ -84,8 +84,8 @@ MILK
 
 **Employees**
 
-* Add an employee: name, PIN (entered manually), and the cafes they belong to with a role at each.  
-* Edit name, PIN, cafe assignments, and role.  
+* Add an employee: first name, last name, PIN (entered manually), and the cafes they belong to with a role at each.  
+* Edit first and last name, PIN, cafe assignments, and role.  
 * Change a users status between employee and admin (per cafe).  
 * Deactivate or reactivate.
 
@@ -173,7 +173,7 @@ Each item has one or more rules. Three types:
 **Entities**
 
 * **Cafe:** id, name  
-* **User:** id, name, pin (unique), active  
+* **User:** id, firstName, lastName, pin (unique), active. Greetings use the first name only.  
 * **UserCafe:** user, cafe, role  
 * **Section:** id, cafe, name, daysOfWeek (0-6 array), active  
 * **SectionExtraDate:** section, date  

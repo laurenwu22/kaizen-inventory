@@ -11,7 +11,7 @@ export function CafeSwitcher({ current, cafes }: { current: string; cafes: { id:
         name="cafeId"
         defaultValue={current}
         onChange={(e) => e.currentTarget.form?.requestSubmit()}
-        className="-ml-1 mt-0.5 h-10 rounded-lg bg-transparent pr-2 text-stone-700 ring-1 ring-stone-200"
+        className="mt-1 h-9 rounded-full bg-paper/70 pl-3 pr-2 text-sm font-medium text-ink ring-1 ring-ink/15"
       >
         {cafes.map((c) => (
           <option key={c.id} value={c.id}>{c.name}</option>

@@ -3,7 +3,8 @@
 //   npx prisma db seed                 cafes + first admin
 //   npx prisma db seed -- --sample     also adds sample sections/items/rules
 //
-// Requires SEED_ADMIN_PIN in .env (never commit it). SEED_ADMIN_NAME is optional.
+// Requires SEED_ADMIN_PIN in .env (never commit it). SEED_ADMIN_FIRST_NAME and
+// SEED_ADMIN_LAST_NAME are optional.
 import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, Role, RuleType } from "../src/generated/prisma/client";
@@ -15,7 +16,8 @@ if (!connectionString) throw new Error("DATABASE_URL is not set");
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 
 async function seedCafesAndAdmin() {
-  const adminName = process.env.SEED_ADMIN_NAME?.trim() || "Lauren Wu";
+  const firstName = process.env.SEED_ADMIN_FIRST_NAME?.trim() || "Lauren";
+  const lastName = process.env.SEED_ADMIN_LAST_NAME?.trim() || "Wu";
   const adminPin = process.env.SEED_ADMIN_PIN?.trim();
   if (!adminPin || !/^\d{3,8}$/.test(adminPin)) {
     throw new Error("Set SEED_ADMIN_PIN in .env to a 3-8 digit PIN");
@@ -27,13 +29,15 @@ async function seedCafesAndAdmin() {
   }
 
   const existing = await prisma.user.findUnique({ where: { pin: adminPin } });
-  if (existing && existing.name !== adminName) {
-    throw new Error(`PIN already belongs to "${existing.name}". Pick another SEED_ADMIN_PIN.`);
+  if (existing && (existing.firstName !== firstName || existing.lastName !== lastName)) {
+    throw new Error(
+      `PIN already belongs to "${existing.firstName} ${existing.lastName}". Pick another SEED_ADMIN_PIN.`,
+    );
   }
   const admin = await prisma.user.upsert({
     where: { pin: adminPin },
     update: { active: true },
-    create: { name: adminName, pin: adminPin },
+    create: { firstName, lastName, pin: adminPin },
   });
 
   for (const cafe of cafes) {
@@ -45,7 +49,7 @@ async function seedCafesAndAdmin() {
   }
 
   console.log(`Cafes: ${cafes.map((c) => c.name).join(", ")}`);
-  console.log(`Admin: ${admin.name} (ADMIN at all ${cafes.length} cafes)`);
+  console.log(`Admin: ${admin.firstName} ${admin.lastName} (ADMIN at all ${cafes.length} cafes)`);
   return cafes;
 }
 

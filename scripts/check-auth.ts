@@ -46,7 +46,7 @@ async function main() {
     prisma.cafe.create({ data: { name: `${tag}_B` } }),
   ]);
   const mkUser = (name: string, pin: string, active = true) =>
-    prisma.user.create({ data: { name: `${tag}_${name}`, pin, active } });
+    prisma.user.create({ data: { firstName: `${tag}_${name}`, lastName: "Test", pin, active } });
   const base = String(Date.now()).slice(-6);
   const [employee, admin, inactive] = await Promise.all([
     mkUser("employee", `9${base}1`),

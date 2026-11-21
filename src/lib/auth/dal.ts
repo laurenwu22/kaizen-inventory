@@ -15,7 +15,7 @@ import type { SessionClaims } from "./token";
 export type Membership = { cafeId: string; cafeName: string; role: Role };
 
 export type Session = {
-  user: { id: string; name: string };
+  user: { id: string; firstName: string; lastName: string; fullName: string };
   /** All cafes the user belongs to, sorted by name. */
   memberships: Membership[];
   /** The selected cafe, or null if none is selected (or it's no longer valid). */
@@ -35,7 +35,8 @@ export async function loadSession(claims: SessionClaims | null): Promise<Session
     where: { id: claims.userId },
     select: {
       id: true,
-      name: true,
+      firstName: true,
+      lastName: true,
       active: true,
       cafes: { select: { role: true, cafe: { select: { id: true, name: true } } } },
     },
@@ -46,7 +47,16 @@ export async function loadSession(claims: SessionClaims | null): Promise<Session
     .map((m) => ({ cafeId: m.cafe.id, cafeName: m.cafe.name, role: m.role }))
     .sort((a, b) => a.cafeName.localeCompare(b.cafeName));
   const current = memberships.find((m) => m.cafeId === claims.cafeId) ?? null;
-  return { user: { id: user.id, name: user.name }, memberships, current };
+  return {
+    user: {
+      id: user.id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      fullName: `${user.firstName} ${user.lastName}`,
+    },
+    memberships,
+    current,
+  };
 }
 
 /** The current session, or null. Cached per request. */

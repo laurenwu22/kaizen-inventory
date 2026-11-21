@@ -65,7 +65,9 @@ async function main() {
     await expect("duplicate item name in section rejected", false, () =>
       prisma.item.create({ data: { sectionId: section.id, name: "Bananas", unit: "bunch" } }));
     await expect("non-digit PIN rejected", false, () =>
-      prisma.user.create({ data: { name: "__check", pin: "12ab" } }));
+      prisma.user.create({ data: { firstName: "__check", lastName: "Test", pin: "12ab" } }));
+    await expect("blank first name rejected", false, () =>
+      prisma.user.create({ data: { firstName: "  ", lastName: "Test", pin: "99999998" } }));
   } finally {
     const sections = await prisma.section.findMany({ where: { cafeId: cafe.id }, select: { id: true } });
     const sectionIds = sections.map((s) => s.id);

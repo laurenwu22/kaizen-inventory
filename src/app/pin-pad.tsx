@@ -42,25 +42,25 @@ export function PinPad() {
   });
 
   const keyClass =
-    "h-16 rounded-2xl bg-white text-2xl font-medium shadow-sm ring-1 ring-stone-200 " +
-    "active:bg-stone-100 disabled:opacity-40 select-none touch-manipulation";
+    "h-16 rounded-2xl bg-white text-2xl font-medium shadow-sm ring-1 ring-ink/10 " +
+    "active:bg-cream disabled:opacity-40 select-none touch-manipulation";
 
   return (
     <div className="w-full max-w-xs">
-      <p className="mb-4 text-center text-stone-600">Enter your Toast PIN</p>
+      <p className="mb-3 text-center text-ink/70">Enter your Toast PIN</p>
 
-      <div className="mb-3 flex h-6 items-center justify-center gap-3" aria-live="polite">
+      <div className="mb-2 flex h-6 items-center justify-center gap-3" aria-live="polite">
         {digits.length === 0 ? (
-          <span className="text-sm text-stone-400">{pending ? "Signing in…" : " "}</span>
+          <span className="text-sm text-ink/40">{pending ? "Signing in…" : " "}</span>
         ) : (
           Array.from({ length: digits.length }).map((_, i) => (
-            <span key={i} className="h-3.5 w-3.5 rounded-full bg-stone-800" />
+            <span key={i} className="h-3.5 w-3.5 rounded-full bg-ink" />
           ))
         )}
         <span className="sr-only">{digits.length} digits entered</span>
       </div>
 
-      <p role="alert" className="mb-4 h-5 text-center text-sm font-medium text-red-600">
+      <p role="alert" className="mb-3 h-5 text-center text-sm font-medium text-red-600">
         {showError ? state.error : ""}
       </p>
 
@@ -86,7 +86,7 @@ export function PinPad() {
           type="button"
           onClick={submit}
           disabled={!canSubmit}
-          className="h-16 rounded-2xl bg-stone-900 text-lg font-semibold text-white shadow-sm active:bg-stone-700 disabled:opacity-30 select-none touch-manipulation"
+          className="h-16 rounded-2xl bg-ink text-lg font-semibold text-white shadow-sm active:bg-ink-hover disabled:opacity-30 select-none touch-manipulation"
         >
           Enter
         </button>
