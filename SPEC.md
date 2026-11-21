@@ -60,6 +60,7 @@
 **Submitting**
 
 * A **Submit** button saves everything to the database as one submission.  
+* Items already submitted today are **pre-filled** with the latest submitted values (count, edited order, or Plenty), labeled with who submitted them and when, so the next person can adjust. Only items that were changed or newly counted are sent on Submit; untouched pre-filled items are not re-submitted.  
 * Items left blank are not included; the Submit area shows how many items weren't counted.  
 * Counts entered but not yet submitted are kept on that phone (per user, cafe and day) so a reload or locked screen doesn't lose them.  
 * The server recalculates the automatic to-order amount from that day's rules; only amounts the employee edited are taken as entered.  

@@ -3,15 +3,22 @@
 // Employee counting screen: today's sections, current stock with 0.5 steppers,
 // automatic to-order amounts (editable), add-on-the-fly sections/items, and
 // one Submit. Entries are kept on this phone until submitted.
+//
+// Items already submitted today are pre-filled with the latest submitted values
+// (the "baseline"). Only items the person changes or newly counts are sent on
+// Submit, so "counted by" stays accurate for everything else.
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { submitInventory, type SubmitState } from "@/app/(app)/inventory/actions";
 import type { CountItem, CountSection } from "@/lib/inventory";
+import type { SubmittedEntry } from "@/lib/combined-data-types";
+import { baselineEntry, isBlank, sameEntry, type Entry } from "@/lib/prefill";
 import { computeAutoOrder, parseOrder, parseQty, stepCount } from "@/lib/order";
 import { formatQty } from "@/lib/quantity";
 import { formatLaTime } from "@/lib/time";
 import { PendingButton } from "@/components/spinner";
 import { CopyForSlack } from "@/components/copy-for-slack";
 import { ui } from "@/components/ui";
+import { SearchInput } from "@/components/search-input";
 
 type Draft = {
   counts: Record<string, string>;
@@ -19,16 +26,27 @@ type Draft = {
   edited: Record<string, boolean>;
   /** Marked "Plenty": obviously above the minimum, not counted. */
   plenty: Record<string, boolean>;
+  /** Items this person has changed; others show the baseline (today's latest submitted values). */
+  touched: Record<string, boolean>;
   addedSections: string[];
   addedItems: string[];
 };
-const EMPTY: Draft = { counts: {}, orders: {}, edited: {}, plenty: {}, addedSections: [], addedItems: [] };
+const EMPTY: Draft = { counts: {}, orders: {}, edited: {}, plenty: {}, touched: {}, addedSections: [], addedItems: [] };
+
 const DRAFT_PREFIX = "kaizen-draft:";
 
 function readDraft(key: string): Draft | null {
   try {
     const raw = localStorage.getItem(key);
-    return raw ? { ...EMPTY, ...JSON.parse(raw) } : null;
+    if (!raw) return null;
+    const d: Draft = { ...EMPTY, ...JSON.parse(raw) };
+    // Drafts saved before pre-filling existed: anything entered counts as touched.
+    if (!JSON.parse(raw).touched) {
+      for (const [k, v] of Object.entries(d.counts)) if (v.trim()) d.touched[k] = true;
+      for (const [k, v] of Object.entries(d.plenty)) if (v) d.touched[k] = true;
+      for (const [k, v] of Object.entries(d.edited)) if (v) d.touched[k] = true;
+    }
+    return d;
   } catch {
     return null;
   }
@@ -46,9 +64,12 @@ export function CountForm({
   sheet,
   draftKey,
   slackText,
+  baseline,
 }: {
   sheet: CountSection[];
   draftKey: string;
+  /** Today's latest submitted entry per item, used to pre-fill. */
+  baseline: Record<string, SubmittedEntry>;
   /** Today's combined order as Slack text, once anyone has submitted today. */
   slackText: string | null;
 }) {
@@ -116,18 +137,30 @@ export function CountForm({
   const notScheduled = sheet.filter((s) => !s.scheduled && !draft.addedSections.includes(s.id));
 
   const update = (fn: (d: Draft) => Draft) => setDraft((d) => fn(d));
-  const setCount = (id: string, value: string) => update((d) => ({ ...d, counts: { ...d.counts, [id]: value } }));
-  const setOrder = (id: string, value: string) =>
-    update((d) => ({ ...d, orders: { ...d.orders, [id]: value }, edited: { ...d.edited, [id]: true } }));
-  const resetOrder = (id: string) => update((d) => ({ ...d, edited: { ...d.edited, [id]: false } }));
+  const entryOf = (d: Draft, id: string): Entry =>
+    d.touched[id]
+      ? { count: d.counts[id] ?? "", order: d.orders[id] ?? "", edited: !!d.edited[id], plenty: !!d.plenty[id] }
+      : baselineEntry(baseline[id]);
+  /** Change one item's entry, starting from what's on screen (baseline or draft). */
+  const change = (id: string, fn: (e: Entry) => Entry) =>
+    update((d) => {
+      const e = fn(entryOf(d, id));
+      return {
+        ...d,
+        touched: { ...d.touched, [id]: true },
+        counts: { ...d.counts, [id]: e.count },
+        orders: { ...d.orders, [id]: e.order },
+        edited: { ...d.edited, [id]: e.edited },
+        plenty: { ...d.plenty, [id]: e.plenty },
+      };
+    });
+  const setCount = (id: string, value: string) => change(id, (e) => ({ ...e, count: value }));
+  const setOrder = (id: string, value: string) => change(id, (e) => ({ ...e, order: value, edited: true }));
+  const resetOrder = (id: string) => change(id, (e) => ({ ...e, edited: false }));
+  // Marking Plenty clears any count or edited order for that item.
   const togglePlenty = (id: string) =>
-    update((d) => ({
-      ...d,
-      plenty: { ...d.plenty, [id]: !d.plenty[id] },
-      // Marking Plenty clears any count or edited order for that item.
-      counts: { ...d.counts, [id]: "" },
-      edited: { ...d.edited, [id]: false },
-    }));
+    change(id, (e) => (e.plenty ? { ...e, plenty: false, count: "" } : { ...e, plenty: true, count: "", edited: false }));
+  const isChanged = (id: string) => !!draft.touched[id] && !sameEntry(entryOf(draft, id), baselineEntry(baseline[id]));
   const addSection = (id: string) => update((d) => ({ ...d, addedSections: [...d.addedSections, id] }));
   const addItem = (id: string) => update((d) => ({ ...d, addedItems: [...d.addedItems, id] }));
   const removeAdded = (sectionId: string) =>
@@ -139,37 +172,40 @@ export function CountForm({
         orders: strip(d.orders),
         edited: strip(d.edited),
         plenty: strip(d.plenty),
+        touched: strip(d.touched),
         addedSections: d.addedSections.filter((s) => s !== sectionId),
         addedItems: d.addedItems.filter((i) => !ids.has(i)),
       };
     });
 
-  // Lines to submit: every visible item with a count.
+  // Lines to submit: visible items this person changed or newly counted.
+  // Pre-filled items left as they are aren't re-sent.
   const lines: { itemId: string; currentCount: string; finalOrder: string; manuallyEdited: boolean; plenty: boolean }[] = [];
   const invalid: string[] = [];
   let uncounted = 0;
   for (const id of visibleIds) {
-    if (draft.plenty[id]) {
-      lines.push({ itemId: id, currentCount: "", finalOrder: "0", manuallyEdited: false, plenty: true });
-      continue;
-    }
-    const raw = draft.counts[id]?.trim() ?? "";
-    if (!raw) {
+    const e = entryOf(draft, id);
+    if (isBlank(e)) {
       // Items in sections already submitted today aren't "missing".
       if (!itemsById.get(id)!.section.submittedToday) uncounted++;
       continue;
     }
+    if (!isChanged(id)) continue;
+    if (e.plenty) {
+      lines.push({ itemId: id, currentCount: "", finalOrder: "0", manuallyEdited: false, plenty: true });
+      continue;
+    }
+    const raw = e.count.trim();
     const current = parseQty(raw);
     const { item } = itemsById.get(id)!;
     if (current === null) {
       invalid.push(item.name);
       continue;
     }
-    const edited = !!draft.edited[id];
     const auto = computeAutoOrder(current, item.min, item.max);
-    const orderRaw = edited ? (draft.orders[id] ?? "") : String(auto);
-    if (edited && parseOrder(orderRaw) === null) invalid.push(item.name);
-    lines.push({ itemId: id, currentCount: raw, finalOrder: orderRaw, manuallyEdited: edited, plenty: false });
+    const orderRaw = e.edited ? e.order : String(auto);
+    if (e.edited && parseOrder(orderRaw) === null) invalid.push(item.name);
+    lines.push({ itemId: id, currentCount: raw, finalOrder: orderRaw, manuallyEdited: e.edited, plenty: false });
   }
 
   return (
@@ -180,7 +216,8 @@ export function CountForm({
         </div>
       ) : (
         visible.map(({ section, items, added }) => {
-          const counted = items.filter((i) => draft.plenty[i.id] || draft.counts[i.id]?.trim()).length;
+          const counted = items.filter((i) => !isBlank(entryOf(draft, i.id))).length;
+          const changedHere = items.some((i) => isChanged(i.id));
           const isCollapsed = !!collapsed[section.id];
           return (
             <section key={section.id} className={`${ui.card} overflow-hidden`}>
@@ -193,7 +230,7 @@ export function CountForm({
                 <span aria-hidden className="h-3.5 w-3.5 shrink-0 rounded-full" style={{ backgroundColor: section.color }} />
                 <span className="min-w-0 flex-1 truncate text-lg font-bold">{section.name}</span>
                 {added && <span className="rounded-full bg-gold/15 px-2 py-0.5 text-xs font-semibold text-[#6b5830]">Added</span>}
-                {section.submittedToday && counted === 0 ? (
+                {section.submittedToday && !changedHere ? (
                   <span className="flex items-center gap-1 text-sm font-semibold text-[#4d7a55]">
                     Submitted
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -223,11 +260,13 @@ export function CountForm({
                       <CountRow
                         key={item.id}
                         item={item}
-                        count={draft.counts[item.id] ?? ""}
-                        edited={!!draft.edited[item.id]}
-                        plenty={!!draft.plenty[item.id]}
+                        count={entryOf(draft, item.id).count}
+                        edited={entryOf(draft, item.id).edited}
+                        plenty={entryOf(draft, item.id).plenty}
                         onPlenty={() => togglePlenty(item.id)}
-                        manualOrder={draft.orders[item.id] ?? ""}
+                        manualOrder={entryOf(draft, item.id).order}
+                        source={baseline[item.id]}
+                        changed={isChanged(item.id)}
                         onCount={(v) => setCount(item.id, v)}
                         onOrder={(v) => setOrder(item.id, v)}
                         onReset={() => resetOrder(item.id)}
@@ -251,7 +290,7 @@ export function CountForm({
       <form action={formAction} className="flex flex-col items-stretch gap-2 pt-2">
         <input type="hidden" name="lines" value={JSON.stringify(lines)} />
         <p className="text-center text-sm text-ink/60">
-          {lines.length} counted
+          {lines.length} to submit
           {uncounted > 0 && (
             <>
               {" · "}
@@ -289,6 +328,8 @@ function CountRow({
   plenty,
   onPlenty,
   manualOrder,
+  source,
+  changed,
   onCount,
   onOrder,
   onReset,
@@ -299,6 +340,9 @@ function CountRow({
   plenty: boolean;
   onPlenty: () => void;
   manualOrder: string;
+  /** Today's latest submitted entry, if any (shown as "Jo · 9:14 AM"). */
+  source?: SubmittedEntry;
+  changed: boolean;
   onCount: (v: string) => void;
   onOrder: (v: string) => void;
   onReset: () => void;
@@ -314,7 +358,18 @@ function CountRow({
   return (
     <li className="px-4 py-3">
       <div className="mb-2 flex items-baseline justify-between gap-3">
-        <span className="min-w-0 truncate font-semibold">{item.name}</span>
+        <span className="min-w-0 truncate">
+          <span className="font-semibold">{item.name}</span>
+          {changed && source ? (
+            <span className="ml-2 text-xs font-semibold text-[#7a6535]">Edited</span>
+          ) : (
+            source && (
+              <span className="ml-2 text-xs text-ink/45">
+                {source.by} · {formatLaTime(new Date(source.at))}
+              </span>
+            )
+          )}
+        </span>
         <span className="shrink-0 text-sm text-ink/60">
           {formatQty(item.min)}–{formatQty(item.max)} {item.unit}
         </span>
@@ -440,22 +495,14 @@ function AddMore({
   return (
     <div className="mt-6 flex flex-col gap-3 border-t border-ink/10 pt-6">
       <h2 className={ui.sectionTitle}>Add items</h2>
-      <div className="relative">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden className="absolute top-1/2 left-3.5 -translate-y-1/2 text-ink/40">
-          <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
-          <path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        </svg>
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="search items to add to inventory"
-          aria-label="Search items to add to inventory"
-          className={`${ui.input} pl-10`}
-        />
-      </div>
+      <SearchInput
+        value={query}
+        onChange={setQuery}
+        placeholder="search items to add to inventory"
+        label="Search items to add to inventory"
+      />
       {q && (
-        <ul className={`${ui.card} divide-y divide-ink/10`}>
+        <ul className={`${ui.card} mt-1 divide-y divide-ink/10`}>
           {results.length === 0 ? (
             <li className="px-4 py-3 text-sm text-ink/55">No matching items to add.</li>
           ) : (

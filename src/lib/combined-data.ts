@@ -38,3 +38,44 @@ export async function loadCombinedOrder(cafeId: string, ymd: string): Promise<Co
     items,
   );
 }
+
+import type { SubmittedEntry } from "./combined-data-types";
+export type { SubmittedEntry };
+
+/**
+ * Today's latest submitted line for each item at the cafe (latest count wins),
+ * used to pre-fill the counting screen.
+ */
+export async function loadLatestEntries(cafeId: string, ymd: string): Promise<Record<string, SubmittedEntry>> {
+  const rows = await prisma.$queryRaw<
+    {
+      itemId: string;
+      currentCount: unknown;
+      finalOrder: unknown;
+      manuallyEdited: boolean;
+      wellStocked: boolean;
+      firstName: string;
+      submittedAt: Date;
+    }[]
+  >`
+    SELECT DISTINCT ON (l."itemId") l."itemId", l."currentCount", l."finalOrder", l."manuallyEdited", l."wellStocked",
+           u."firstName", s."submittedAt"
+    FROM "SubmissionLine" l
+    JOIN "Submission" s ON s.id = l."submissionId"
+    JOIN "User" u ON u.id = s."userId"
+    WHERE s."cafeId" = ${cafeId} AND s."businessDate" = ${dateOnly(ymd)}::date
+    ORDER BY l."itemId", s."submittedAt" DESC`;
+  return Object.fromEntries(
+    rows.map((r) => [
+      r.itemId,
+      {
+        count: r.currentCount === null ? null : Number(r.currentCount),
+        finalOrder: Number(r.finalOrder),
+        manuallyEdited: r.manuallyEdited,
+        plenty: r.wellStocked,
+        by: r.firstName,
+        at: r.submittedAt.toISOString(),
+      },
+    ]),
+  );
+}
