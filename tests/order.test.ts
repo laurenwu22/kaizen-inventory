@@ -2,12 +2,13 @@ import { describe, expect, it } from "vitest";
 import { computeAutoOrder, parseOrder, parseQty, stepCount } from "@/lib/order";
 import { buildCountSheet, type SectionInput } from "@/lib/inventory";
 
-describe("computeAutoOrder (SPEC: at or below min -> max - current, else 0)", () => {
+describe("computeAutoOrder (SPEC: below min -> max - current, else 0)", () => {
   it("orders up to max when below min", () => {
     expect(computeAutoOrder(1, 2, 4)).toBe(3);
   });
-  it("orders up to max when exactly at min", () => {
-    expect(computeAutoOrder(2, 2, 4)).toBe(2);
+  it("orders nothing when exactly at min", () => {
+    expect(computeAutoOrder(2, 2, 4)).toBe(0);
+    expect(computeAutoOrder(0.5, 0.5, 2)).toBe(0);
   });
   it("orders nothing above min", () => {
     expect(computeAutoOrder(2.5, 2, 4)).toBe(0);
@@ -15,10 +16,10 @@ describe("computeAutoOrder (SPEC: at or below min -> max - current, else 0)", ()
   });
   it("rounds partial amounts up to a whole number", () => {
     expect(computeAutoOrder(0, 2, 4)).toBe(4);
-    expect(computeAutoOrder(0.5, 0.5, 2)).toBe(2); // 1.5 -> 2
+    expect(computeAutoOrder(0.5, 1, 2)).toBe(2); // 1.5 -> 2
     expect(computeAutoOrder(1.5, 2, 4)).toBe(3); // 2.5 -> 3
     expect(computeAutoOrder(0.1, 0.3, 0.3)).toBe(1); // 0.2 -> 1
-    expect(computeAutoOrder(2, 2, 2)).toBe(0); // exactly at max
+    expect(computeAutoOrder(1.5, 2, 2)).toBe(1); // 0.5 -> 1
   });
   it("never goes negative even if min > max slipped through", () => {
     expect(computeAutoOrder(3, 5, 2)).toBe(0);

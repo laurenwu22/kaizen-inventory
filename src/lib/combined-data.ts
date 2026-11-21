@@ -10,7 +10,7 @@ export async function loadCombinedOrder(cafeId: string, ymd: string): Promise<Co
     orderBy: { submittedAt: "asc" },
     select: {
       submittedAt: true,
-      user: { select: { firstName: true } },
+      user: { select: { firstName: true, lastName: true } },
       lines: {
         select: {
           itemId: true,
@@ -32,7 +32,7 @@ export async function loadCombinedOrder(cafeId: string, ymd: string): Promise<Co
   return mergeDay(
     submissions.map((s) => ({
       submittedAt: s.submittedAt,
-      submittedBy: s.user.firstName,
+      submittedBy: `${s.user.firstName} ${s.user.lastName}`,
       lines: s.lines.map((l) => ({ itemId: l.itemId, finalOrder: Number(l.finalOrder) })),
     })),
     items,

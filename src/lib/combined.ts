@@ -17,7 +17,7 @@ export type ItemInfo = {
 
 export type DaySubmission = {
   submittedAt: Date;
-  submittedBy: string; // first name
+  submittedBy: string; // full name
   lines: { itemId: string; finalOrder: number }[];
 };
 

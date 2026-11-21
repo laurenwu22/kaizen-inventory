@@ -110,9 +110,9 @@ afterAll(async () => {
 
 describe("submitInventory", () => {
   it("saves one submission with today's business date and server-computed orders", async () => {
-    const r = await submit([line(ids.bananas, "3"), line(ids.milk, "1")]);
+    const r = await submit([line(ids.bananas, "2"), line(ids.milk, "1")]);
     expect(r.result?.submitted?.counted).toBe(2);
-    // Bananas today: 3-6, count 3 is at min -> order 3. Milk 0.5-2, count 1 > min -> 0.
+    // Bananas today: 3-6, count 2 is below min -> order 4. Milk 0.5-2, count 1 > min -> 0.
     expect(Number((await latestLine(ids.milk)).finalOrder)).toBe(0);
     const sub = await prisma.submission.findFirstOrThrow({
       where: { cafeId: ids.cafeA },
@@ -122,12 +122,17 @@ describe("submitInventory", () => {
     expect(sub.userId).toBe(ids.employee);
     expect(sub.businessDate.toISOString().slice(0, 10)).toBe(today);
     const b = sub.lines.find((l) => l.itemId === ids.bananas)!;
-    expect([Number(b.currentCount), Number(b.autoOrder), Number(b.finalOrder), b.manuallyEdited]).toEqual([3, 3, 3, false]);
+    expect([Number(b.currentCount), Number(b.autoOrder), Number(b.finalOrder), b.manuallyEdited]).toEqual([2, 4, 4, false]);
+  });
+
+  it("orders nothing when stock is exactly at the minimum", async () => {
+    await submit([line(ids.bananas, "3")]); // today's min is 3
+    expect(Number((await latestLine(ids.bananas)).finalOrder)).toBe(0);
   });
 
   it("rounds the automatic order up to a whole number", async () => {
-    await submit([line(ids.milk, "0.5")]); // milk 0.5-2: 2 - 0.5 = 1.5 -> 2
-    expect(Number((await latestLine(ids.milk)).finalOrder)).toBe(2);
+    await submit([line(ids.bananas, "2.5")]); // bananas today 3-6: 6 - 2.5 = 3.5 -> 4
+    expect(Number((await latestLine(ids.bananas)).finalOrder)).toBe(4);
   });
 
   it("ignores a tampered order amount unless it's marked as manually edited", async () => {
@@ -199,6 +204,6 @@ describe("loadCombinedOrder", () => {
     const order = await loadCombinedOrder(ids.cafeA, today);
     const lines = order.sections.flatMap((s) => s.lines.map((l) => `${l.name}:${l.order}`));
     expect(lines).toEqual(["Bananas:5"]); // milk's latest count is 0; yesterday's 7 and cafe B ignored
-    expect(order.submissions.every((s) => s.by.startsWith(tag))).toBe(true);
+    expect(order.submissions.every((s) => s.by.startsWith(tag) && s.by.endsWith(" Test"))).toBe(true); // full name
   });
 });

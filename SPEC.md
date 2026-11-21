@@ -51,7 +51,7 @@
 * Each item shows its name, unit, and today's min and max.  
 * The employee enters **current stock**. Decimals are allowed (for example 0.5 bunch), and the input steps by 0.5.  
 * **To order** is calculated automatically:  
-  * If current stock is **at or below the minimum**: to-order \= maximum minus current.  
+  * If current stock is **below the minimum**: to-order \= maximum minus current, rounded up to a whole number.  
   * Otherwise: to-order \= 0\.  
 * The employee can manually edit the to-order value after it is generated.   
 * Today's min and max come from the quantity rules (explained in below section).
@@ -205,7 +205,7 @@ Landing Page:
   * View modular windows that show different sections of inventory such as perishables, sauce ingredients, etc  
   * Employees will fill in the current number in stock and the number needed to order will be automatically generated  
     * The to-order number can be manually edited by the employee after the amount is auto generated  
-    * If current stock is at or below the minimum, to-order \= maximum − current, otherwise 0  
+    * If current stock is below the minimum, to-order \= maximum − current, otherwise 0  
   * Employee view will default to show only the inventory sections that have been selected by admin for that day, however they should also be able to add sections or individual items that may need to be flagged on the fly  
   * When employees finish, they will click a ‘save’ or ‘submit’ button which will save all of the data to the database and automatically generate a structured text to copy-and-paste into Slack that details what needs to be ordered and how much of it  
   * If employees work at multiple locations, they can select the location that they’re entering inventory for when they sign in  

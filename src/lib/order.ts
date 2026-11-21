@@ -14,13 +14,13 @@ const cents = (n: number) => Math.round(n * 100);
 const fromCents = (c: number) => c / 100;
 
 /**
- * SPEC: if current stock is at or below the minimum, order max - current;
- * otherwise order nothing. Orders are whole units, so this rounds up
- * (e.g. 2 - 0.5 = 1.5 -> 2).
+ * SPEC: if current stock is below the minimum, order max - current;
+ * otherwise (at or above the minimum) order nothing. Orders are whole units,
+ * so this rounds up (e.g. 2 - 0.5 = 1.5 -> 2).
  */
 export function computeAutoOrder(current: number, min: number, max: number): number {
   const c = cents(current);
-  if (c > cents(min)) return 0;
+  if (c >= cents(min)) return 0;
   return Math.ceil(Math.max(0, cents(max) - c) / 100);
 }
 
