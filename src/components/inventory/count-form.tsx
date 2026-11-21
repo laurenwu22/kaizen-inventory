@@ -17,10 +17,12 @@ type Draft = {
   counts: Record<string, string>;
   orders: Record<string, string>;
   edited: Record<string, boolean>;
+  /** Marked "Plenty": obviously above the minimum, not counted. */
+  plenty: Record<string, boolean>;
   addedSections: string[];
   addedItems: string[];
 };
-const EMPTY: Draft = { counts: {}, orders: {}, edited: {}, addedSections: [], addedItems: [] };
+const EMPTY: Draft = { counts: {}, orders: {}, edited: {}, plenty: {}, addedSections: [], addedItems: [] };
 const DRAFT_PREFIX = "kaizen-draft:";
 
 function readDraft(key: string): Draft | null {
@@ -118,6 +120,14 @@ export function CountForm({
   const setOrder = (id: string, value: string) =>
     update((d) => ({ ...d, orders: { ...d.orders, [id]: value }, edited: { ...d.edited, [id]: true } }));
   const resetOrder = (id: string) => update((d) => ({ ...d, edited: { ...d.edited, [id]: false } }));
+  const togglePlenty = (id: string) =>
+    update((d) => ({
+      ...d,
+      plenty: { ...d.plenty, [id]: !d.plenty[id] },
+      // Marking Plenty clears any count or edited order for that item.
+      counts: { ...d.counts, [id]: "" },
+      edited: { ...d.edited, [id]: false },
+    }));
   const addSection = (id: string) => update((d) => ({ ...d, addedSections: [...d.addedSections, id] }));
   const addItem = (id: string) => update((d) => ({ ...d, addedItems: [...d.addedItems, id] }));
   const removeAdded = (sectionId: string) =>
@@ -128,16 +138,21 @@ export function CountForm({
         counts: strip(d.counts),
         orders: strip(d.orders),
         edited: strip(d.edited),
+        plenty: strip(d.plenty),
         addedSections: d.addedSections.filter((s) => s !== sectionId),
         addedItems: d.addedItems.filter((i) => !ids.has(i)),
       };
     });
 
   // Lines to submit: every visible item with a count.
-  const lines: { itemId: string; currentCount: string; finalOrder: string; manuallyEdited: boolean }[] = [];
+  const lines: { itemId: string; currentCount: string; finalOrder: string; manuallyEdited: boolean; plenty: boolean }[] = [];
   const invalid: string[] = [];
   let uncounted = 0;
   for (const id of visibleIds) {
+    if (draft.plenty[id]) {
+      lines.push({ itemId: id, currentCount: "", finalOrder: "0", manuallyEdited: false, plenty: true });
+      continue;
+    }
     const raw = draft.counts[id]?.trim() ?? "";
     if (!raw) {
       // Items in sections already submitted today aren't "missing".
@@ -154,7 +169,7 @@ export function CountForm({
     const auto = computeAutoOrder(current, item.min, item.max);
     const orderRaw = edited ? (draft.orders[id] ?? "") : String(auto);
     if (edited && parseOrder(orderRaw) === null) invalid.push(item.name);
-    lines.push({ itemId: id, currentCount: raw, finalOrder: orderRaw, manuallyEdited: edited });
+    lines.push({ itemId: id, currentCount: raw, finalOrder: orderRaw, manuallyEdited: edited, plenty: false });
   }
 
   return (
@@ -165,7 +180,7 @@ export function CountForm({
         </div>
       ) : (
         visible.map(({ section, items, added }) => {
-          const counted = items.filter((i) => draft.counts[i.id]?.trim()).length;
+          const counted = items.filter((i) => draft.plenty[i.id] || draft.counts[i.id]?.trim()).length;
           const isCollapsed = !!collapsed[section.id];
           return (
             <section key={section.id} className={`${ui.card} overflow-hidden`}>
@@ -210,6 +225,8 @@ export function CountForm({
                         item={item}
                         count={draft.counts[item.id] ?? ""}
                         edited={!!draft.edited[item.id]}
+                        plenty={!!draft.plenty[item.id]}
+                        onPlenty={() => togglePlenty(item.id)}
                         manualOrder={draft.orders[item.id] ?? ""}
                         onCount={(v) => setCount(item.id, v)}
                         onOrder={(v) => setOrder(item.id, v)}
@@ -269,6 +286,8 @@ function CountRow({
   item,
   count,
   edited,
+  plenty,
+  onPlenty,
   manualOrder,
   onCount,
   onOrder,
@@ -277,6 +296,8 @@ function CountRow({
   item: CountItem;
   count: string;
   edited: boolean;
+  plenty: boolean;
+  onPlenty: () => void;
   manualOrder: string;
   onCount: (v: string) => void;
   onOrder: (v: string) => void;
@@ -300,9 +321,36 @@ function CountRow({
       </div>
       <div className="flex items-end gap-3">
         <div className="min-w-0 flex-[3]">
-          <label className="mb-1 block text-xs font-semibold text-ink/55" htmlFor={`count-${item.id}`}>
-            Current stock
-          </label>
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <label className="block text-xs font-semibold text-ink/55" htmlFor={`count-${item.id}`}>
+              Current stock
+            </label>
+            <button
+              type="button"
+              onClick={onPlenty}
+              aria-pressed={plenty}
+              title="Obviously above the minimum: skip counting"
+              className={`flex h-8 items-center gap-1 rounded-full px-3 text-xs font-semibold ${
+                plenty ? "bg-[#e3eee4] text-[#3f6b47] ring-1 ring-[#9fc2a5]" : "text-ink/60 ring-1 ring-ink/15 active:bg-cream"
+              }`}
+            >
+              {plenty && (
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+              Plenty
+            </button>
+          </div>
+          {plenty ? (
+            <button
+              type="button"
+              onClick={onPlenty}
+              className="flex h-12 w-full items-center justify-center rounded-xl bg-[#eef5ef] text-sm font-semibold text-[#3f6b47] ring-1 ring-[#cfe1d2]"
+            >
+              Plenty · tap to count
+            </button>
+          ) : (
           <div className="flex items-center gap-1.5">
             <button
               type="button"
@@ -331,9 +379,10 @@ function CountRow({
               +
             </button>
           </div>
+          )}
         </div>
         <div className="min-w-0 flex-[2]">
-          <div className="mb-1 flex items-center justify-between gap-2">
+          <div className="mb-1.5 flex h-8 items-center justify-between gap-2">
             <label className="block text-xs font-semibold text-ink/55" htmlFor={`order-${item.id}`}>
               To order
             </label>
@@ -349,8 +398,8 @@ function CountRow({
             inputMode="numeric"
             autoComplete="off"
             placeholder="–"
-            disabled={current === null}
-            value={orderValue}
+            disabled={current === null || plenty}
+            value={plenty ? "0" : orderValue}
             onChange={(e) => onOrder(e.target.value)}
             className={`${inputBase} disabled:bg-cream/60 disabled:text-ink/30 ${
               orderInvalid ? "ring-2 ring-red-500" : edited ? "ring-2 ring-gold" : "ring-ink/20"

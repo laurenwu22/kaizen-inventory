@@ -38,7 +38,7 @@ const tag = `test-inv-${Date.now()}`;
 const ids = { cafeA: "", cafeB: "", employee: "", bananas: "", milk: "", offItem: "", itemB: "" };
 const today = laDateString();
 
-type Line = { itemId: string; currentCount: string; finalOrder: string; manuallyEdited: boolean };
+type Line = { itemId: string; currentCount: string; finalOrder: string; manuallyEdited: boolean; plenty?: boolean };
 const submit = async (lines: Line[] | string) => {
   const fd = new FormData();
   fd.set("lines", typeof lines === "string" ? lines : JSON.stringify(lines));
@@ -187,6 +187,42 @@ describe("submitInventory", () => {
     expect((await submit([line(ids.itemB, "1")])).redirect).toBe("/select-cafe");
     cookieValue = saved;
     expect(await prisma.submission.count({ where: { cafeId: ids.cafeB } })).toBe(0);
+  });
+});
+
+describe("Plenty", () => {
+  it("saves an item marked Plenty with no count and nothing to order", async () => {
+    const r = await submit([{ ...line(ids.milk, ""), plenty: true } as Line]);
+    expect(r.result?.submitted?.counted).toBe(1);
+    const l = await latestLine(ids.milk);
+    expect([l.currentCount, Number(l.autoOrder), Number(l.finalOrder), l.wellStocked]).toEqual([null, 0, 0, true]);
+  });
+
+  it("ignores a count or order sent along with Plenty", async () => {
+    await submit([{ ...line(ids.bananas, "0", { finalOrder: "9", manuallyEdited: true }), plenty: true } as Line]);
+    const l = await latestLine(ids.bananas);
+    expect([l.currentCount, Number(l.finalOrder), l.wellStocked]).toEqual([null, 0, true]);
+  });
+
+  it("a later Plenty removes an earlier order from the combined order (latest wins)", async () => {
+    await submit([line(ids.bananas, "0")]); // orders 6
+    await submit([{ ...line(ids.bananas, ""), plenty: true } as Line]);
+    const order = await loadCombinedOrder(ids.cafeA, today);
+    expect(order.sections.flatMap((s) => s.lines.map((l) => l.name))).not.toContain("Bananas");
+  });
+
+  it("the database rejects a Plenty line that has a count or an order", async () => {
+    const sub = await prisma.submission.create({ data: { cafeId: ids.cafeA, userId: ids.employee, businessDate: new Date(`${today}T00:00:00Z`) } });
+    await expect(
+      prisma.submissionLine.create({ data: { submissionId: sub.id, itemId: ids.milk, currentCount: 2, autoOrder: 0, finalOrder: 0, wellStocked: true } }),
+    ).rejects.toThrow();
+    await expect(
+      prisma.submissionLine.create({ data: { submissionId: sub.id, itemId: ids.milk, currentCount: null, autoOrder: 0, finalOrder: 3, wellStocked: true } }),
+    ).rejects.toThrow();
+    await expect(
+      prisma.submissionLine.create({ data: { submissionId: sub.id, itemId: ids.milk, currentCount: null, autoOrder: 0, finalOrder: 0, wellStocked: false } }),
+    ).rejects.toThrow();
+    await prisma.submission.delete({ where: { id: sub.id } });
   });
 });
 

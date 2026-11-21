@@ -7,7 +7,7 @@ import { HeaderTabs } from "./header-tabs";
 // Menu entries from SPEC.md. Add an href as each page is built.
 const MENU_ITEMS: MenuItem[] = [
   { label: "View today's combined order", href: "/order" },
-  { label: "View order history" }, // build step 6
+  { label: "View order history", href: "/history" },
   { label: "Create PDF" }, // build step 7
 ];
 

@@ -26,6 +26,8 @@ const lineSchema = z.object({
   currentCount: z.string(),
   finalOrder: z.string(),
   manuallyEdited: z.boolean(),
+  /** Marked "Plenty": obviously above the minimum, not counted, orders nothing. */
+  plenty: z.boolean().optional().default(false),
 });
 
 export async function submitInventory(_prev: SubmitState, fd: FormData): Promise<SubmitState> {
@@ -60,6 +62,10 @@ export async function submitInventory(_prev: SubmitState, fd: FormData): Promise
   const lines = [];
   for (const l of input) {
     const item = byId.get(l.itemId)!;
+    if (l.plenty) {
+      lines.push({ itemId: item.id, currentCount: null, autoOrder: 0, finalOrder: 0, manuallyEdited: false, wellStocked: true });
+      continue;
+    }
     const current = parseQty(l.currentCount);
     if (current === null) return { error: `Check the count for ${item.name}.` };
     const q = resolveQuantity(item.rules.map(toRule), today);
@@ -71,7 +77,14 @@ export async function submitInventory(_prev: SubmitState, fd: FormData): Promise
       if (edited === null) return { error: `The order amount for ${item.name} must be a whole number.` };
       finalOrder = edited;
     }
-    lines.push({ itemId: item.id, currentCount: current, autoOrder, finalOrder, manuallyEdited: finalOrder !== autoOrder });
+    lines.push({
+      itemId: item.id,
+      currentCount: current,
+      autoOrder,
+      finalOrder,
+      manuallyEdited: finalOrder !== autoOrder,
+      wellStocked: false,
+    });
   }
 
   const submission = await prisma.submission.create({

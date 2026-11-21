@@ -156,10 +156,13 @@ model SubmissionLine {
   id             String     @id @default(cuid())
   submissionId   String
   itemId         String
-  currentCount   Decimal    @db.Decimal(10, 2)
+  /// Null when the item was marked "Plenty" instead of counted.
+  currentCount   Decimal?   @db.Decimal(10, 2)
   autoOrder      Decimal    @db.Decimal(10, 2)
   finalOrder     Decimal    @db.Decimal(10, 2)
   manuallyEdited Boolean    @default(false)
+  /// Marked "Plenty": obviously above the minimum, not counted, orders 0.
+  wellStocked    Boolean    @default(false)
   submission     Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
   item           Item       @relation(fields: [itemId], references: [id], onDelete: Restrict)
 

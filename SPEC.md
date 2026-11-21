@@ -53,6 +53,7 @@
 * **To order** is calculated automatically:  
   * If current stock is **below the minimum**: to-order \= maximum minus current, rounded up to a whole number.  
   * Otherwise: to-order \= 0\.  
+* **Plenty:** instead of counting, the employee can tap **Plenty** on an item that is obviously above the minimum. It's saved with no count and nothing to order, counts as checked (so the section can be complete), and as the latest count it overrides an earlier order that day.  
 * The employee can manually edit the to-order value after it is generated.   
 * Today's min and max come from the quantity rules (explained in below section).
 
@@ -148,13 +149,13 @@ Each item has one or more rules. Three types:
 
 ## **Calendar**
 
-* ## A month grid in America/Los\_Angeles time with previous and next month controls.
+* ## A month grid in America/Los\_Angeles time with previous and next month controls. Weeks start on Monday.
 
 * ## Dates that have at least one submission are marked with the colors that correspond with the sections that were inventoried on those days. For example, if milk, perishables, and cups were ordered, there would be three dots each on that day. Future dates cannot be selected.
 
 * ## Tapping a date shows what was ordered that day: items with a to-order amount above 0, grouped by section, with the amount and unit.
 
-* ## The day view uses the same merge rule as the combined order view (latest count wins) and lists who submitted and when.
+* ## The day view uses the same merge rule as the combined order view (latest count wins) and lists who submitted and when. It also has a Copy for Slack button for that day's order.
 
 * ## A date with no submissions shows *No inventory submitted this day*.
 
@@ -188,7 +189,7 @@ Each item has one or more rules. Three types:
 * **Item:** id, section, name, unit, active  
 * **QuantityRule:** id, item, type, weekday (only for weekday rules), date (only for date rules), min, max  
 * **Submission:** id, cafe, user, businessDate (LA date), submittedAt (UTC)  
-* **SubmissionLine:** submission, item, currentCount, autoOrder, finalOrder, manuallyEdited
+* **SubmissionLine:** submission, item, currentCount (empty when marked Plenty), autoOrder, finalOrder, manuallyEdited, wellStocked (Plenty)
 
 **Derived, not stored:**
 
