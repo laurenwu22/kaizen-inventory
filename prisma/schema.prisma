@@ -164,3 +164,14 @@ model SubmissionLine {
   @@unique([submissionId, itemId])
   @@index([itemId])
 }
+
+/// Sign-in attempts, used to rate-limit PIN guessing. Holds no PINs.
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  ip        String
+  success   Boolean
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([ip, createdAt])
+  @@index([createdAt])
+}

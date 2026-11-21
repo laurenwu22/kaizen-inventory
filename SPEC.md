@@ -19,11 +19,13 @@
 
 * **Landing page**  
   * Toast-style number pad. The employee enters their Toast PIN.  
+  * PINs are 3 or 4 digits (not a fixed length), so the pad has an Enter key.  
   * No inventory status or timestamp is shown here.  
 * **After PIN entry**  
 1. The PIN must match one active user. **PINs are unique across all cafes.**  
 2. If the user belongs to more than one cafe, they pick the location. If only one, they go straight in.  
-3. The app stores the user and selected cafe in a session cookie so they stay signed in on their phone.  
+3. The app stores the user and selected cafe in a session cookie so they stay signed in on their phone. Sessions last 7 days and renew while the app is in use; there is a Sign out option.  
+* Repeated wrong PINs are rate-limited: 5 failures from one IP in 10 minutes blocks that IP for 10 minutes.  
 4. The user lands on the Employee view. Admins also see an entry point to Admin.  
 * Note: the PIN is entered by an admin when adding the employee, and matches the person's Toast PIN.
 
@@ -66,7 +68,7 @@
 
 ```
 Kaizen Inventory Order, Fri 11/20/2026
-Submitted by: Maria, Dev
+Submitted by: Teno, Gabe
 
 PERISHABLES
 - Bananas: 3 bunches
@@ -188,7 +190,7 @@ Each item has one or more rules. Three types:
 
 Landing Page: 
 
-* Show a timestamp of when the inventory was last updated and by whom  
+* ~~Show a timestamp of when the inventory was last updated and by whom~~ (superseded: see Sign-In Flow; "last updated" is shown in the Employee view header instead)  
 * Show sign in with Toast-like number pad, employees will enter their Toast number
 
 2 Views:

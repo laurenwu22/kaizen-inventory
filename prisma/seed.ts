@@ -17,8 +17,8 @@ const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) })
 async function seedCafesAndAdmin() {
   const adminName = process.env.SEED_ADMIN_NAME?.trim() || "Lauren Wu";
   const adminPin = process.env.SEED_ADMIN_PIN?.trim();
-  if (!adminPin || !/^\d{4,8}$/.test(adminPin)) {
-    throw new Error("Set SEED_ADMIN_PIN in .env to a 4-8 digit PIN");
+  if (!adminPin || !/^\d{3,8}$/.test(adminPin)) {
+    throw new Error("Set SEED_ADMIN_PIN in .env to a 3-8 digit PIN");
   }
 
   const cafes = [];
