@@ -31,3 +31,26 @@ body {
   outline: 2px solid var(--color-gold);
   outline-offset: 2px;
 }
+
+/*
+ * Pointer cursor on everything clickable. Tailwind v4 resets buttons to the
+ * default arrow; links already get the pointer.
+ */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="radio"],
+  select:not(:disabled),
+  summary,
+  label:has(> input[type="checkbox"]:not(:disabled)),
+  label:has(> input[type="radio"]:not(:disabled)),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="date"]:not(:disabled) {
+    cursor: pointer;
+  }
+  button:disabled,
+  select:disabled {
+    cursor: not-allowed;
+  }
+}

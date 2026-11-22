@@ -32,7 +32,7 @@ const { Role } = await import("@/generated/prisma/client");
 const { signSession } = await import("@/lib/auth/token");
 const { loadSession } = await import("@/lib/auth/dal");
 const actions = await import("@/app/(app)/admin/employees/actions");
-const { createCafe } = await import("@/app/(app)/admin/cafes/actions");
+const { createCafe, deleteCafe } = await import("@/app/(app)/admin/cafes/actions");
 
 // No "_" or "%" in the tag: Prisma startsWith uses SQL LIKE.
 const tag = `test-emp-${Date.now()}`;
@@ -207,6 +207,62 @@ describe("creating cafes (managers)", () => {
     const off = await prisma.user.create({ data: { firstName: `${tag}-off`, lastName: "Test", pin: nextPin(), active: false } });
     expect((await run(() => mk(`${tag}-Other`, [{ userId: off.id, role: "EMPLOYEE" }]))).result?.fieldErrors?.members).toMatch(/deactivated/);
     expect(await prisma.cafe.findUnique({ where: { name: `${tag}-Other` } })).toBeNull();
+  });
+});
+
+describe("deleting cafes (managers)", () => {
+  async function fullCafe(name: string) {
+    const cafe = await prisma.cafe.create({
+      data: { name, members: { create: [{ userId: ids.emp, role: Role.EMPLOYEE }] } },
+    });
+    const section = await prisma.section.create({
+      data: { cafeId: cafe.id, name: "Produce", extraDates: { create: [{ date: new Date("2026-12-01") }] } },
+    });
+    const item = await prisma.item.create({
+      data: { sectionId: section.id, name: "Bananas", unit: "bunches", rules: { create: [{ type: "DEFAULT", min: 2, max: 4 }] } },
+    });
+    await prisma.submission.create({
+      data: {
+        cafeId: cafe.id,
+        userId: ids.emp,
+        businessDate: new Date("2026-11-20"),
+        lines: { create: [{ itemId: item.id, currentCount: 1, autoOrder: 3, finalOrder: 3 }] },
+      },
+    });
+    await prisma.dayAddition.create({
+      data: { cafeId: cafe.id, businessDate: new Date("2026-11-20"), sectionId: section.id, addedById: ids.emp },
+    });
+    return cafe;
+  }
+
+  it("removes the cafe and everything in it, history included; people keep their accounts", async () => {
+    const cafe = await fullCafe(`${tag}-Closing`);
+    const r = await run(() => deleteCafe(cafe.id));
+    expect(r.result?.ok).toBe(true);
+    expect(await prisma.cafe.findUnique({ where: { id: cafe.id } })).toBeNull();
+    expect(await prisma.section.count({ where: { cafeId: cafe.id } })).toBe(0);
+    expect(await prisma.submission.count({ where: { cafeId: cafe.id } })).toBe(0);
+    expect(await prisma.userCafe.count({ where: { cafeId: cafe.id } })).toBe(0);
+    expect(await prisma.user.findUnique({ where: { id: ids.emp } })).not.toBeNull();
+    expect(await roleAt(ids.emp, ids.A)).toBe("EMPLOYEE");
+  });
+
+  it("deleting the cafe you're in sends you to pick another", async () => {
+    const cafe = await fullCafe(`${tag}-Mine`);
+    await as(ids.manager, cafe.id);
+    expect((await run(() => deleteCafe(cafe.id))).redirect).toBe("/select-cafe");
+    expect(await prisma.cafe.findUnique({ where: { id: cafe.id } })).toBeNull();
+    await as(ids.manager, ids.A);
+  });
+
+  it("admins and employees can't delete a cafe", async () => {
+    await prisma.userCafe.update({ where: { userId_cafeId: { userId: ids.adminA, cafeId: ids.A } }, data: { role: Role.ADMIN } });
+    await as(ids.adminA, ids.A);
+    expect((await run(() => deleteCafe(ids.B))).redirect).toBe("/admin");
+    await as(ids.emp, ids.A);
+    expect((await run(() => deleteCafe(ids.B))).redirect).toBe("/inventory");
+    expect(await prisma.cafe.findUnique({ where: { id: ids.B } })).not.toBeNull();
+    await as(ids.manager, ids.A);
   });
 });
 

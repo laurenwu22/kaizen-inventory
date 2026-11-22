@@ -1,10 +1,12 @@
 "use client";
 
-// New cafe form: name, plus people from other cafes with a role at the new one.
+// New cafe form (name, plus people from other cafes with a role at the new
+// one) and the delete-cafe confirmation.
 import { useActionState, useEffect, useState } from "react";
 import type { FormState } from "@/lib/admin/validation";
 import { SearchInput } from "@/components/search-input";
 import { ui } from "@/components/ui";
+import { Spinner } from "@/components/spinner";
 import { FieldError, FormError, SubmitButton } from "./form-bits";
 import { ModalButton } from "./modal-button";
 
@@ -59,7 +61,7 @@ function CafeEditor({
         <label className={ui.label} htmlFor="cafe-name">
           Cafe name
         </label>
-        <input id="cafe-name" name="name" placeholder="e.g. Kaizen Downtown" className={ui.input} autoComplete="off" />
+        <input id="cafe-name" name="name" placeholder="Kaizen Labs" className={ui.input} autoComplete="off" />
         <FieldError state={state} name="name" />
       </div>
 
@@ -122,6 +124,73 @@ function CafeEditor({
       <FormError state={state} />
       <div className="flex items-center gap-3 border-t border-ink/10 pt-5">
         <SubmitButton>Create cafe</SubmitButton>
+      </div>
+    </form>
+  );
+}
+
+/** "Delete" on a cafe row: a pop-up that spells out what goes with it. */
+export function DeleteCafeModal({
+  action,
+  cafe,
+}: {
+  action: (prev: FormState, fd: FormData) => Promise<FormState>;
+  cafe: { name: string; people: number; sections: number; submissions: number; onlyCafeFor: string[] };
+}) {
+  return (
+    <ModalButton
+      label="Delete"
+      title={`Delete ${cafe.name}?`}
+      buttonClassName="h-9 shrink-0 rounded-full px-3 text-sm font-semibold text-red-700 ring-1 ring-red-200 active:bg-red-50"
+    >
+      {(close) => <DeleteCafeConfirm action={action} cafe={cafe} onCancel={close} />}
+    </ModalButton>
+  );
+}
+
+function DeleteCafeConfirm({
+  action,
+  cafe,
+  onCancel,
+}: {
+  action: (prev: FormState, fd: FormData) => Promise<FormState>;
+  cafe: { name: string; people: number; sections: number; submissions: number; onlyCafeFor: string[] };
+  onCancel: () => void;
+}) {
+  const [state, formAction, pending] = useActionState(action, {});
+  useEffect(() => {
+    if (state.savedAt) onCancel();
+  }, [state.savedAt, onCancel]);
+  const n = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
+
+  return (
+    <form action={formAction} className="flex flex-col gap-4">
+      <p>This permanently deletes {cafe.name} and everything in it. It can&apos;t be undone.</p>
+      <ul className="list-disc pl-5 text-sm text-ink/70">
+        <li>
+          {n(cafe.sections, "section", "sections")} and {cafe.sections === 1 ? "its" : "their"} items
+        </li>
+        <li>{n(cafe.submissions, "past submission", "past submissions")} (order history)</li>
+        <li>{n(cafe.people, "person", "people")} removed from this cafe (their accounts stay)</li>
+      </ul>
+      {cafe.onlyCafeFor.length > 0 && (
+        <p className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200">
+          {cafe.onlyCafeFor.join(", ")} {cafe.onlyCafeFor.length === 1 ? "works" : "work"} only here and won&apos;t be able
+          to sign in until added to another cafe.
+        </p>
+      )}
+      {state.error && <p className={ui.error}>{state.error}</p>}
+      <div className="flex items-center gap-2 border-t border-ink/10 pt-4">
+        <button
+          type="submit"
+          disabled={pending}
+          className="inline-flex h-11 min-w-36 items-center justify-center rounded-full bg-red-700 px-5 text-sm font-semibold text-white active:bg-red-800 disabled:opacity-40"
+        >
+          {pending ? <Spinner /> : "Yes, delete cafe"}
+        </button>
+        <button type="button" onClick={onCancel} className="h-11 px-3 text-sm font-semibold text-ink/60">
+          Cancel
+        </button>
       </div>
     </form>
   );

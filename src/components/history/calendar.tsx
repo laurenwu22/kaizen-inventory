@@ -2,6 +2,7 @@ import Link from "next/link";
 import { addMonths, monthGrid, monthLabel, monthOf, WEEKDAY_INITIALS } from "@/lib/history";
 import type { DotSection } from "@/lib/history-data";
 import { ui } from "@/components/ui";
+import { PendingDot, ReportPending } from "./pending";
 
 const href = (month: string, date: string) => `/history?month=${month}&date=${date}`;
 
@@ -27,18 +28,26 @@ export function Calendar({
       <div className="mb-3 flex items-center justify-between gap-2">
         <Link href={href(prev, selected)} scroll={false} aria-label="Previous month" className={nav}>
           ‹
-        </Link>
+          <ReportPending />
+          </Link>
         <div className="flex items-center gap-3">
-          <h2 className="text-lg font-bold">{monthLabel(month)}</h2>
+          <h2 className="relative text-lg font-bold">
+            {monthLabel(month)}
+            <span className="absolute top-1/2 -left-7 -translate-y-1/2">
+              <PendingDot />
+            </span>
+          </h2>
           {(month !== monthOf(today) || selected !== today) && (
             <Link href={href(monthOf(today), today)} scroll={false} className="rounded-full px-3 py-1 text-sm font-semibold text-[#7a6535] ring-1 ring-gold/40 active:bg-cream">
               Today
-            </Link>
+              <ReportPending />
+          </Link>
           )}
         </div>
         {canGoNext ? (
           <Link href={href(next, selected)} scroll={false} aria-label="Next month" className={nav}>
             ›
+            <ReportPending />
           </Link>
         ) : (
           <span className={`${nav} opacity-25`} aria-hidden>
@@ -92,7 +101,8 @@ export function Calendar({
                 className={`flex h-14 flex-col items-center justify-center gap-1 rounded-xl active:bg-cream ${c.inMonth ? "" : "text-ink/35"}`}
               >
                 {content}
-              </Link>
+                <ReportPending />
+          </Link>
             );
           })}
       </div>

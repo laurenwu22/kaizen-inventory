@@ -5,15 +5,16 @@ import Link from "next/link";
 import type { ItemHistory } from "@/lib/history-data";
 import { formatQty } from "@/lib/quantity";
 import { formatYmd } from "@/lib/time";
-import { LinkSpinner } from "@/components/spinner";
 import { ui } from "@/components/ui";
 import { SearchInput } from "@/components/search-input";
+import { useHistoryNav } from "./pending";
 
 const href = (ymd: string) => `/history?month=${ymd.slice(0, 7)}&date=${ymd}`;
 
 /** Search item names as you type; each result shows last ordered and last counted. */
 export function ItemSearch({ items }: { items: ItemHistory[] }) {
   const [query, setQuery] = useState("");
+  const { go } = useHistoryNav();
   const q = query.trim().toLowerCase();
   const results = q ? items.filter((i) => i.name.toLowerCase().includes(q)).slice(0, 20) : [];
 
@@ -49,9 +50,16 @@ export function ItemSearch({ items }: { items: ItemHistory[] }) {
             return (
               <li key={i.id}>
                 {target ? (
-                  <Link href={href(target)} scroll={false} onClick={() => setQuery("")} className="flex items-center gap-3 px-4 py-3 active:bg-cream">
+                  <Link href={href(target)} scroll={false} onClick={(e) => {
+                      // Navigate in a transition so the page can show it's loading
+                      // even though this list closes right away.
+                      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                      e.preventDefault();
+                      setQuery("");
+                      go(href(target));
+                    }}
+                    className="flex items-center gap-3 px-4 py-3 active:bg-cream">
                     <span className="min-w-0 flex-1">{body}</span>
-                    <LinkSpinner />
                   </Link>
                 ) : (
                   <div className="px-4 py-3">{body}</div>

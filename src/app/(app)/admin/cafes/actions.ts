@@ -2,6 +2,7 @@
 
 // Cafe management (managers only).
 import { refresh } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireManager } from "@/lib/auth/dal";
@@ -44,6 +45,38 @@ export async function createCafe(_prev: FormState, fd: FormData): Promise<FormSt
     }
     throw e;
   }
+  refresh();
+  return saved();
+}
+
+/**
+ * Permanently deletes a cafe with everything in it: sections, items, quantity
+ * rules, past submissions and who works there. People keep their accounts.
+ * The last cafe can't be deleted (nobody could sign in to anything).
+ */
+export async function deleteCafe(cafeId: string): Promise<FormState> {
+  const session = await requireManager();
+  const cafe = await prisma.cafe.findUnique({ where: { id: cafeId }, select: { id: true } });
+  if (!cafe) {
+    refresh();
+    return saved();
+  }
+  if ((await prisma.cafe.count()) <= 1) return { error: "This is the only cafe, so it can't be deleted." };
+
+  const inCafe = { section: { cafeId } };
+  await prisma.$transaction([
+    prisma.submissionLine.deleteMany({ where: { submission: { cafeId } } }),
+    prisma.submission.deleteMany({ where: { cafeId } }),
+    prisma.dayAddition.deleteMany({ where: { cafeId } }),
+    prisma.quantityRule.deleteMany({ where: { item: inCafe } }),
+    prisma.item.deleteMany({ where: inCafe }),
+    prisma.sectionExtraDate.deleteMany({ where: inCafe }),
+    prisma.section.deleteMany({ where: { cafeId } }),
+    prisma.userCafe.deleteMany({ where: { cafeId } }),
+    prisma.cafe.delete({ where: { id: cafeId } }),
+  ]);
+  // Deleted the cafe you were in: pick another.
+  if (session.current.cafeId === cafeId) redirect("/select-cafe");
   refresh();
   return saved();
 }

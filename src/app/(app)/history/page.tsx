@@ -8,6 +8,7 @@ import { Calendar } from "@/components/history/calendar";
 import { ItemSearch } from "@/components/history/item-search";
 import { CombinedOrderDetails } from "@/components/combined-order-details";
 import { ContentSpinner } from "@/components/spinner";
+import { HistoryPendingProvider, PendingArea, PendingDot } from "@/components/history/pending";
 import { ui } from "@/components/ui";
 
 // Order history: read-only, selected cafe only. ?month=YYYY-MM&date=YYYY-MM-DD
@@ -32,17 +33,24 @@ async function History({ searchParams }: { searchParams: Promise<Record<string, 
   ]);
 
   return (
+    <HistoryPendingProvider>
     <div className="flex flex-col gap-5">
       <ItemSearch items={items} />
       <Calendar month={month} selected={date} today={today} dots={dots} />
       <div>
-        <h2 className={`${ui.sectionTitle} mb-3`}>
-          {formatYmd(date)}
-          {date === today && " · Today"}
+        <h2 className={`${ui.sectionTitle} mb-3 flex items-center gap-2`}>
+          <span>
+            {formatYmd(date)}
+            {date === today && " · Today"}
+          </span>
+          <PendingDot />
         </h2>
-        <CombinedOrderDetails ymd={date} order={order} emptyMessage="No inventory submitted this day." />
+        <PendingArea>
+          <CombinedOrderDetails ymd={date} order={order} emptyMessage="No inventory submitted this day." />
+        </PendingArea>
       </div>
     </div>
+    </HistoryPendingProvider>
   );
 }
 
