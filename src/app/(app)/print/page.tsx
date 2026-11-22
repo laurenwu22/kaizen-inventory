@@ -57,8 +57,6 @@ async function PrintSheet({ searchParams }: { searchParams: Promise<Record<strin
           <div className="grid w-fit shrink-0 grid-cols-[auto_10rem] items-end gap-x-2 gap-y-3 text-sm sm:pt-1">
             <span>Counted by</span>
             <span className="h-5 border-b border-ink" />
-            <span>Time</span>
-            <span className="h-5 border-b border-ink" />
           </div>
         </header>
 
