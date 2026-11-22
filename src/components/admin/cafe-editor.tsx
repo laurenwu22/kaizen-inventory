@@ -19,7 +19,7 @@ export function NewCafeModal({
   people: PersonOption[];
 }) {
   return (
-    <ModalButton label="+ New cafe" title="New cafe" buttonClassName={ui.primary}>
+    <ModalButton label="+ Add cafe" title="Add cafe" buttonClassName={ui.primary}>
       {(close) => <CafeEditor action={action} people={people} onSaved={close} />}
     </ModalButton>
   );
