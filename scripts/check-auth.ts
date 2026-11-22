@@ -118,7 +118,17 @@ async function main() {
     r = await visit(`/admin/sections/${sectionB.id}`, await tok(admin.id, cafeA.id));
     check("admin at A: cafe B's section page is not found", !r.body.includes("Check B") && (r.status === 404 || r.body.includes("NEXT_HTTP_ERROR_FALLBACK;404") || r.body.includes("could not be found")), `got ${r.status}`);
 
+    // Employees and Cafes are for managers only
+    for (const path of ["/admin/employees", "/admin/cafes"]) {
+      r = await visit(path, await tok(admin.id, cafeA.id));
+      check(`admin (not manager): ${path} -> /admin`, r.redirectTo === "/admin", `got ${r.status} ${r.redirectTo}`);
+      r = await visit(path, good);
+      check(`employee: ${path} -> /inventory`, r.redirectTo === "/inventory", `got ${r.status} ${r.redirectTo}`);
+    }
+    r = await visit("/admin", await tok(admin.id, cafeA.id));
+    check("admin (not manager): no Employees/Cafes tabs", !r.body.includes('href="/admin/employees"') && !r.body.includes('href="/admin/cafes"'));
 
+    // Deactivation and demotion apply immediately to existing sessions
     r = await visit("/inventory", await tok(inactive.id, cafeA.id));
     check("deactivated user's session -> /", r.redirectTo === "/", `got ${r.status} ${r.redirectTo}`);
     await prisma.userCafe.update({

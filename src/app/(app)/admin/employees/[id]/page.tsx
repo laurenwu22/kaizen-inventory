@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { requireAdmin } from "@/lib/auth/dal";
+import { requireManager } from "@/lib/auth/dal";
+import { compareNames } from "@/lib/quantity";
 import { prisma } from "@/lib/db";
 import { BackLink, Card, PageTitle } from "@/components/admin/admin-chrome";
 import { DeleteButton } from "@/components/admin/delete-button";
@@ -9,17 +10,14 @@ import { ContentSpinner } from "@/components/spinner";
 import { setEmployeeActive, updateEmployee } from "../actions";
 
 async function EmployeeAdmin({ params }: { params: Promise<{ id: string }> }) {
-  const session = await requireAdmin();
+  const session = await requireManager();
   const { id } = await params;
-  // Only people who work at the admin's selected cafe.
-  const person = await prisma.user.findFirst({
-    where: { id, cafes: { some: { cafeId: session.current.cafeId } } },
-    include: { cafes: { include: { cafe: { select: { name: true } } } } },
-  });
+  const [person, cafes] = await Promise.all([
+    prisma.user.findUnique({ where: { id }, include: { cafes: true } }),
+    prisma.cafe.findMany({ select: { id: true, name: true } }),
+  ]);
   if (!person) notFound();
-
-  const managed = session.memberships.filter((m) => m.role === "ADMIN");
-  const managedIds = new Set(managed.map((m) => m.cafeId));
+  cafes.sort((a, b) => compareNames(a.name, b.name));
   const name = `${person.firstName} ${person.lastName}`;
 
   return (
@@ -37,17 +35,13 @@ async function EmployeeAdmin({ params }: { params: Promise<{ id: string }> }) {
         <Card>
           <EmployeeEditor
             action={updateEmployee.bind(null, person.id)}
-            managedCafes={managed.map((m) => ({ id: m.cafeId, name: m.cafeName }))}
-            otherMemberships={person.cafes
-              .filter((m) => !managedIds.has(m.cafeId))
-              .map((m) => ({ cafeName: m.cafe.name, role: m.role }))}
+            managedCafes={cafes}
             initial={{
               firstName: person.firstName,
               lastName: person.lastName,
               pin: person.pin,
-              memberships: Object.fromEntries(
-                person.cafes.filter((m) => managedIds.has(m.cafeId)).map((m) => [m.cafeId, m.role]),
-              ),
+              isManager: person.isManager,
+              memberships: Object.fromEntries(person.cafes.map((m) => [m.cafeId, m.role])),
             }}
             submitLabel="Save changes"
           />

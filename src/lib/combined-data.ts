@@ -2,7 +2,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { dateOnly } from "@/lib/time";
-import { mergeDay, type CombinedOrder, type ItemInfo } from "./combined";
+import { formatSlack, mergeDay, type CombinedOrder, type ItemInfo } from "./combined";
 
 export async function loadCombinedOrder(cafeId: string, ymd: string): Promise<CombinedOrder> {
   const submissions = await prisma.submission.findMany({
@@ -94,4 +94,38 @@ export async function loadDayAdditions(cafeId: string, ymd: string): Promise<Sha
     if (r.itemId) out.items[r.itemId] ??= r.addedBy.firstName;
   }
   return out;
+}
+
+/** Slack text for just the most recent submission at the cafe on a day, or null. */
+export async function loadLatestSubmissionSlack(cafeId: string, ymd: string): Promise<string | null> {
+  const s = await prisma.submission.findFirst({
+    where: { cafeId, businessDate: dateOnly(ymd) },
+    orderBy: { submittedAt: "desc" },
+    select: {
+      submittedAt: true,
+      user: { select: { firstName: true, lastName: true } },
+      lines: {
+        select: {
+          itemId: true,
+          finalOrder: true,
+          item: { select: { name: true, unit: true, sortOrder: true, section: { select: { id: true, name: true, sortOrder: true } } } },
+        },
+      },
+    },
+  });
+  if (!s) return null;
+  const items = new Map<string, ItemInfo>(s.lines.map((l) => [l.itemId, l.item]));
+  return formatSlack(
+    ymd,
+    mergeDay(
+      [
+        {
+          submittedAt: s.submittedAt,
+          submittedBy: `${s.user.firstName} ${s.user.lastName}`,
+          lines: s.lines.map((l) => ({ itemId: l.itemId, finalOrder: Number(l.finalOrder) })),
+        },
+      ],
+      items,
+    ),
+  );
 }

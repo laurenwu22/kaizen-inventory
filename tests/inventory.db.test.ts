@@ -31,7 +31,7 @@ const { Role, RuleType } = await import("@/generated/prisma/client");
 const { signSession } = await import("@/lib/auth/token");
 const { laDateString, weekdayOf } = await import("@/lib/time");
 const { submitInventory } = await import("@/app/(app)/inventory/actions");
-const { loadCombinedOrder, loadDayAdditions } = await import("@/lib/combined-data");
+const { loadCombinedOrder, loadDayAdditions, loadLatestSubmissionSlack } = await import("@/lib/combined-data");
 
 // No "_" or "%" in the tag: Prisma startsWith uses SQL LIKE.
 const tag = `test-inv-${Date.now()}`;
@@ -264,6 +264,22 @@ describe("sections and items added for today", () => {
         data: { cafeId: ids.cafeA, businessDate: new Date(`${today}T00:00:00Z`), addedById: ids.employee, sectionId: ids.perishables, itemId: ids.milk },
       }),
     ).rejects.toThrow();
+  });
+});
+
+describe("Copy for Slack below Submit", () => {
+  it("covers only what was just submitted, and the page falls back to the latest submission", async () => {
+    await submit([line(ids.bananas, "0")]); // earlier: Bananas 6
+    const r = await submit([line(ids.milk, "0")]); // latest: Milk 2 only
+    expect(r.result?.submitted?.slack).toContain("- Milk: 2 units");
+    expect(r.result?.submitted?.slack).not.toContain("Bananas");
+    const latest = await loadLatestSubmissionSlack(ids.cafeA, today);
+    expect(latest).toBe(r.result?.submitted?.slack);
+  });
+
+  it("says Nothing to order when the submission ordered nothing", async () => {
+    const r = await submit([line(ids.milk, "5")]);
+    expect(r.result?.submitted?.slack).toMatch(/Nothing to order\.$/);
   });
 });
 

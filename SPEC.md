@@ -10,10 +10,11 @@
 ## **Users and Roles:**
 
 * **Employee:** counts inventory at the cafes they are assigned to.  
-* **Admin:** everything an employee can do, plus management of employees, sections, and items.  
+* **Admin:** everything an employee can do, plus management of sections and items at the cafes where they are an admin.  
+* **Manager:** organization-wide. Can open and act as an admin at every cafe without being assigned to it, manages employees (including who is an admin or manager), and creates new cafes.  
 * **Admin status is per cafe.** A person can be an admin at one cafe and an employee at another.  
 * Employees are **deactivated**, never deleted, so history stays intact.  
-* The last active admin at a cafe cannot be demoted or deactivated.
+* There must always be at least one active manager: the last one cannot be demoted or deactivated. Cafes may have no admins (managers cover them).
 
 ## **Sign-In Flow**
 
@@ -71,7 +72,7 @@
 * Only items with a to-order amount above 0 are included.  
 * A single **Copy for Slack** button copies the structured text (title, date and items; no "Submitted by" line).  
 * The combined order page (from the menu) also lists who submitted and when, and who counted each item.  
-* On the Inventory page, after submitting, the form clears and a **Copy for Slack** button for today's combined order appears below the Submit button (and stays for the rest of the day once anyone has submitted).  
+* On the Inventory page, the **Copy for Slack** button below Submit copies only what was just submitted (items with something to order). On a later visit it copies the most recent submission at the cafe that day. The combined order page and order history copy the full merged order.  
 * Example output:
 
 ```
@@ -95,8 +96,8 @@ MILK
 * Edit first and last name, PIN, cafe assignments, and role.  
 * Change a users status between employee and admin (per cafe).  
 * Deactivate or reactivate. Deactivated people can't sign in at any cafe; their past counts stay in the order history. People are never deleted.  
-* Admins manage the people who work at their selected cafe. They can only add people to, or change roles at, cafes where they are an admin; other cafes are shown read-only.  
-* Any admin at one of a person's cafes can deactivate them, as long as no cafe is left without an active admin.  
+* Only managers manage employees (admins no longer can). Managers can assign anyone to any cafe with a role, and mark people as managers.  
+* Managers can deactivate anyone, as long as at least one active manager remains.  
 * PINs are hidden (shown as ••••) until an admin taps Show. Each PIN must be unique across all cafes.
 
 **Sections**
@@ -110,6 +111,10 @@ MILK
 * Deleting an item permanently removes it and its quantity rules. An item that has already been counted in a submission can't be deleted, so past orders stay intact.  
 * **Every new item must have a default min and max** before it can be saved.  
 * Add optional **weekday rules** and **one-time date rules** (see section 7).
+
+**Cafes (managers)**
+
+* Create a cafe: name it and pick people from the other cafes to add, with Employee or Admin at the new cafe. It appears in everyone's cafe switcher right away and starts with no sections.
 
 **CSV import and export**
 
@@ -184,7 +189,7 @@ Each item has one or more rules. Three types:
 **Entities**
 
 * **Cafe:** id, name  
-* **User:** id, firstName, lastName, pin (unique), active. Greetings use the first name only.  
+* **User:** id, firstName, lastName, pin (unique), active, isManager. Greetings use the first name only.  
 * **UserCafe:** user, cafe, role  
 * **Section:** id, cafe, name, daysOfWeek (0-6 array), active  
 * **SectionExtraDate:** section, date  

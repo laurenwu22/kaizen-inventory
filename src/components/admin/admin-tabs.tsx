@@ -5,33 +5,45 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LinkSpinner } from "@/components/spinner";
 
-type Tab = "sections" | "employees" | null;
+type Tab = "sections" | "employees" | "cafes" | null;
 
-/** Sections | Employees sub-tabs inside Admin. */
-export function AdminTabs() {
+/** Sections | Employees | Cafes sub-tabs inside Admin (the last two for managers). */
+export function AdminTabs({ manager }: { manager: boolean }) {
   // The URL is request-time data on dynamic pages, so read it inside Suspense;
   // the fallback draws the same tabs without a highlight for that instant.
   return (
-    <Suspense fallback={<TabsView tab={null} />}>
-      <CurrentTabs />
+    <Suspense fallback={<TabsView tab={null} manager={manager} />}>
+      <CurrentTabs manager={manager} />
     </Suspense>
   );
 }
 
-function CurrentTabs() {
+function CurrentTabs({ manager }: { manager: boolean }) {
   const pathname = usePathname();
-  return <TabsView tab={pathname.startsWith("/admin/employees") ? "employees" : "sections"} />;
+  const tab: Tab = pathname.startsWith("/admin/employees")
+    ? "employees"
+    : pathname.startsWith("/admin/cafes")
+      ? "cafes"
+      : "sections";
+  return <TabsView tab={tab} manager={manager} />;
 }
 
-function TabsView({ tab }: { tab: Tab }) {
+function TabsView({ tab, manager }: { tab: Tab; manager: boolean }) {
   return (
     <nav className="flex gap-6 border-b border-ink/10" aria-label="Admin">
       <SubTab href="/admin" selected={tab === "sections"}>
         Sections
       </SubTab>
-      <SubTab href="/admin/employees" selected={tab === "employees"}>
-        Employees
-      </SubTab>
+      {manager && (
+        <>
+          <SubTab href="/admin/employees" selected={tab === "employees"}>
+            Employees
+          </SubTab>
+          <SubTab href="/admin/cafes" selected={tab === "cafes"}>
+            Cafes
+          </SubTab>
+        </>
+      )}
     </nav>
   );
 }

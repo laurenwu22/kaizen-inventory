@@ -36,8 +36,8 @@ async function seedCafesAndAdmin() {
   }
   const admin = await prisma.user.upsert({
     where: { pin: adminPin },
-    update: { active: true },
-    create: { firstName, lastName, pin: adminPin },
+    update: { active: true, isManager: true },
+    create: { firstName, lastName, pin: adminPin, isManager: true },
   });
 
   for (const cafe of cafes) {
@@ -49,7 +49,7 @@ async function seedCafesAndAdmin() {
   }
 
   console.log(`Cafes: ${cafes.map((c) => c.name).join(", ")}`);
-  console.log(`Admin: ${admin.firstName} ${admin.lastName} (ADMIN at all ${cafes.length} cafes)`);
+  console.log(`Admin: ${admin.firstName} ${admin.lastName} (manager, ADMIN at all ${cafes.length} cafes)`);
   return cafes;
 }
 

@@ -73,7 +73,7 @@ export function CountForm({
   baseline: Record<string, SubmittedEntry>;
   /** Sections/items others added to today's count and submitted. */
   shared: SharedAdditions;
-  /** Today's combined order as Slack text, once anyone has submitted today. */
+  /** Slack text for the most recent submission today (null if none yet). */
   slackText: string | null;
 }) {
   const [state, formAction] = useActionState<SubmitState, FormData>(submitInventory, {});
@@ -331,7 +331,10 @@ export function CountForm({
             </svg>
           </p>
         )}
-        {slackText && <CopyForSlack text={slackText} className="mt-1" />}
+        {/* Just-submitted order if this person submitted; otherwise today's latest submission. */}
+        {(state.submitted?.slack ?? slackText) && (
+          <CopyForSlack text={state.submitted?.slack ?? slackText!} className="mt-1" />
+        )}
       </form>
 
       <AddMore sheet={sheet} notScheduled={notScheduled} visibleIds={visibleIds} onAddSection={addSection} onAddItem={addItem} />

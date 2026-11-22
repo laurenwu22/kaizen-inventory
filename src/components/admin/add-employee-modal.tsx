@@ -10,15 +10,13 @@ export function AddEmployeeModal({
   action,
   managedCafes,
   defaultCafeId,
-  cafeName,
 }: {
   action: (prev: FormState, fd: FormData) => Promise<FormState>;
   managedCafes: { id: string; name: string }[];
   defaultCafeId: string;
-  cafeName: string;
 }) {
   return (
-    <ModalButton label="+ Add employee" title="Add employee" subtitle={cafeName} buttonClassName={ui.primary}>
+    <ModalButton label="+ Add employee" title="Add employee" buttonClassName={ui.primary}>
       {(close) => (
         <EmployeeEditor
           action={action}

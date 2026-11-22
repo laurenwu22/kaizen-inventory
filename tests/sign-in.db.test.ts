@@ -133,6 +133,22 @@ describe("signIn", () => {
   });
 });
 
+describe("managers", () => {
+  it("a manager with no assigned cafes can sign in and pick any cafe", async () => {
+    const taken = new Set((await prisma.user.findMany({ select: { pin: true } })).map((u) => u.pin));
+    let pin = "";
+    for (let i = 8000000; i < 8999999; i++) if (!taken.has(String(i))) { pin = String(i); break; }
+    await prisma.user.create({ data: { firstName: `${tag}_mgr`, lastName: "Test", pin, isManager: true } });
+    const r = await attempt(pin);
+    // There are always several cafes (this test adds three), so they pick one.
+    expect(r.redirect).toBe("/select-cafe");
+    const fd = new FormData();
+    fd.set("cafeId", cafeC.id); // not assigned to C, but managers can open any cafe
+    expect(await act(() => selectCafe(fd))).toBe("/inventory");
+    expect((await sessionClaims())?.cafeId).toBe(cafeC.id);
+  });
+});
+
 describe("selectCafe and signOut", () => {
   it("switches to a cafe the user belongs to", async () => {
     await attempt(pin4);

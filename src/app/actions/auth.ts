@@ -20,15 +20,19 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
 
   const user = await prisma.user.findUnique({
     where: { pin },
-    select: { id: true, active: true, cafes: { select: { cafeId: true } } },
+    select: { id: true, active: true, isManager: true, cafes: { select: { cafeId: true } } },
   });
-  const ok = !!user && user.active && user.cafes.length > 0;
+  // Managers can open every cafe, so they don't need to be assigned to one.
+  const cafeIds = user?.isManager
+    ? (await prisma.cafe.findMany({ select: { id: true } })).map((c) => c.id)
+    : (user?.cafes.map((c) => c.cafeId) ?? []);
+  const ok = !!user && user.active && cafeIds.length > 0;
   await recordAttempt(ip, ok);
   // Same message for unknown, inactive and unassigned users, so the response
   // never reveals whether a PIN belongs to someone.
   if (!ok) return { error: "PIN not recognized" };
 
-  const cafeId = user.cafes.length === 1 ? user.cafes[0].cafeId : null;
+  const cafeId = cafeIds.length === 1 ? cafeIds[0] : null;
   await createSession(user.id, cafeId);
   redirect(cafeId ? "/inventory" : "/select-cafe");
 }

@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { requireAdmin } from "@/lib/auth/dal";
+import { requireManager } from "@/lib/auth/dal";
 import { prisma } from "@/lib/db";
 import { compareNames } from "@/lib/quantity";
 import { PageTitle } from "@/components/admin/admin-chrome";
@@ -9,19 +9,15 @@ import { AddEmployeeModal } from "@/components/admin/add-employee-modal";
 import { ContentSpinner, LinkSpinner } from "@/components/spinner";
 import { createEmployee } from "./actions";
 
-// Admin > Employees: everyone who works at the selected cafe.
+// Admin > Employees (managers only): everyone in the organization.
 
 async function EmployeesAdmin() {
-  const session = await requireAdmin();
-  const cafeId = session.current.cafeId;
-  const managedCafes = session.memberships
-    .filter((m) => m.role === "ADMIN")
-    .map((m) => ({ id: m.cafeId, name: m.cafeName }));
-
-  const people = await prisma.user.findMany({
-    where: { cafes: { some: { cafeId } } },
-    include: { cafes: { include: { cafe: { select: { name: true } } } } },
-  });
+  const session = await requireManager();
+  const [people, cafes] = await Promise.all([
+    prisma.user.findMany({ include: { cafes: { include: { cafe: { select: { name: true } } } } } }),
+    prisma.cafe.findMany({ select: { id: true, name: true } }),
+  ]);
+  cafes.sort((a, b) => compareNames(a.name, b.name));
   people.sort((a, b) => compareNames(`${a.firstName} ${a.lastName}`, `${b.firstName} ${b.lastName}`));
   const active = people.filter((p) => p.active);
   const inactive = people.filter((p) => !p.active);
@@ -32,9 +28,8 @@ async function EmployeesAdmin() {
         action={
           <AddEmployeeModal
             action={createEmployee}
-            managedCafes={managedCafes}
-            defaultCafeId={cafeId}
-            cafeName={session.current.cafeName}
+            managedCafes={cafes}
+            defaultCafeId={session.current.cafeId}
           />
         }
       >
@@ -46,8 +41,10 @@ async function EmployeesAdmin() {
           id: p.id,
           name: `${p.firstName} ${p.lastName}`,
           pin: p.pin,
-          role: p.cafes.find((m) => m.cafeId === cafeId)!.role,
-          otherCafes: p.cafes.filter((m) => m.cafeId !== cafeId).map((m) => m.cafe.name),
+          isManager: p.isManager,
+          cafes: p.cafes
+            .sort((a, b) => compareNames(a.cafe.name, b.cafe.name))
+            .map((m) => `${m.cafe.name}${m.role === "ADMIN" ? " (Admin)" : ""}`),
           isYou: p.id === session.user.id,
         }))}
       />

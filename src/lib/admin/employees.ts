@@ -1,4 +1,4 @@
-// Employee management: validation and the "last active admin" rule.
+// Employee management: validation and the "last active manager" rule.
 import { z } from "zod";
 import { PIN_PATTERN } from "@/lib/auth/pin";
 import type { FieldErrors, FormState } from "./validation";
@@ -8,7 +8,8 @@ export type EmployeeInput = {
   firstName: string;
   lastName: string;
   pin: string;
-  /** Desired memberships, only for cafes the acting admin manages. */
+  isManager: boolean;
+  /** Desired cafe assignments with a role at each. */
   memberships: MembershipInput[];
 };
 
@@ -26,13 +27,13 @@ const membershipsSchema = z.array(
 );
 
 /**
- * Validates the employee form. `managedCafeIds` are the cafes the acting admin
- * is an admin at; memberships for any other cafe are rejected.
+ * Validates the employee form. `managedCafeIds` are the cafes that exist (the
+ * acting manager can assign any of them); anything else is rejected. Managers
+ * don't need a cafe; everyone else needs at least one.
  */
 export function parseEmployeeForm(
-  raw: { firstName: string; lastName: string; pin: string; memberships: string },
+  raw: { firstName: string; lastName: string; pin: string; memberships: string; isManager?: string },
   managedCafeIds: ReadonlySet<string>,
-  { requireAtLeastOne }: { requireAtLeastOne: boolean },
 ): { data: EmployeeInput; state?: undefined } | { data?: undefined; state: FormState } {
   const fieldErrors: FieldErrors = {};
   const base = baseSchema.safeParse(raw);
@@ -50,19 +51,20 @@ export function parseEmployeeForm(
     fieldErrors.memberships ??= "A cafe is listed twice.";
   }
   if (memberships.some((m) => !managedCafeIds.has(m.cafeId))) {
-    fieldErrors.memberships ??= "You can only assign cafes where you're an admin.";
+    fieldErrors.memberships ??= "One of those cafes doesn't exist anymore. Refresh and try again.";
   }
-  if (requireAtLeastOne && memberships.length === 0) {
-    fieldErrors.memberships ??= "Pick at least one cafe.";
+  const isManager = raw.isManager === "true";
+  if (!isManager && memberships.length === 0) {
+    fieldErrors.memberships ??= "Pick at least one cafe (managers don't need one).";
   }
 
   if (Object.keys(fieldErrors).length > 0 || !base.success) return { state: { fieldErrors } };
-  return { data: { ...base.data, memberships } };
+  return { data: { ...base.data, isManager, memberships } };
 }
 
-/** Thrown inside a transaction to roll it back when a cafe would lose its last active admin. */
-export class LastAdminError extends Error {
-  constructor(public cafeName: string) {
-    super(`${cafeName} needs at least one active admin.`);
+/** Thrown inside a transaction to roll it back when the last active manager would be removed. */
+export class LastManagerError extends Error {
+  constructor() {
+    super("There must always be at least one active manager.");
   }
 }

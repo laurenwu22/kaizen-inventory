@@ -1,8 +1,7 @@
 "use client";
 
-// Employee form: name, Toast PIN (hidden until shown), and cafes with a role at
-// each. Only cafes the acting admin manages are editable; others are listed
-// read-only.
+// Employee form (managers only): name, Toast PIN (hidden until shown), whether
+// they're a manager, and cafes with a role at each.
 import { useActionState, useEffect, useState } from "react";
 import type { FormState } from "@/lib/admin/validation";
 import { ui } from "@/components/ui";
@@ -13,18 +12,15 @@ type Role = "EMPLOYEE" | "ADMIN";
 export function EmployeeEditor({
   action,
   managedCafes,
-  otherMemberships = [],
   initial,
   defaultCafeId,
   submitLabel,
   onSaved,
 }: {
   action: (prev: FormState, fd: FormData) => Promise<FormState>;
-  /** Cafes the acting admin is an admin at (editable). */
+  /** Every cafe (managers can assign any). */
   managedCafes: { id: string; name: string }[];
-  /** The person's memberships at cafes the admin doesn't manage (read-only). */
-  otherMemberships?: { cafeName: string; role: Role }[];
-  initial?: { firstName: string; lastName: string; pin: string; memberships: Record<string, Role> };
+  initial?: { firstName: string; lastName: string; pin: string; isManager: boolean; memberships: Record<string, Role> };
   /** For new employees: the cafe that starts checked. */
   defaultCafeId?: string;
   submitLabel: string;
@@ -32,6 +28,7 @@ export function EmployeeEditor({
 }) {
   const [state, formAction] = useActionState(action, {});
   const [showPin, setShowPin] = useState(false);
+  const [manager, setManager] = useState(initial?.isManager ?? false);
   const [memberships, setMemberships] = useState<Record<string, Role>>(
     initial?.memberships ?? (defaultCafeId ? { [defaultCafeId]: "EMPLOYEE" } : {}),
   );
@@ -90,8 +87,28 @@ export function EmployeeEditor({
         <FieldError state={state} name="pin" />
       </div>
 
+      <label
+        className={`flex cursor-pointer items-start gap-3 rounded-2xl p-3 ring-1 ${
+          manager ? "bg-gold/10 ring-gold/40" : "bg-cream/50 ring-ink/10"
+        }`}
+      >
+        <input
+          type="checkbox"
+          checked={manager}
+          onChange={(e) => setManager(e.target.checked)}
+          className="mt-0.5 h-5 w-5 shrink-0 accent-[#23211e]"
+        />
+        <span>
+          <span className="block font-semibold">Manager</span>
+          <span className="block text-sm text-ink/60">
+            Manages employees and cafes, and can act as an admin at every cafe.
+          </span>
+        </span>
+      </label>
+      <input type="hidden" name="isManager" value={manager ? "true" : "false"} />
+
       <fieldset>
-        <legend className={ui.label}>Cafes</legend>
+        <legend className={ui.label}>Cafes{manager ? " (optional for managers)" : ""}</legend>
         <ul className="flex flex-col gap-2">
           {managedCafes.map((c) => {
             const role = memberships[c.id];
@@ -127,15 +144,6 @@ export function EmployeeEditor({
               </li>
             );
           })}
-          {otherMemberships.map((m) => (
-            <li key={m.cafeName} className="flex items-center justify-between gap-3 rounded-2xl bg-cream/50 p-3 text-sm ring-1 ring-ink/10">
-              <span>
-                <span className="font-semibold text-ink/70">{m.cafeName}</span>
-                <span className="block text-ink/50">Managed by that cafe&apos;s admins</span>
-              </span>
-              <span className="text-ink/60">{m.role === "ADMIN" ? "Admin" : "Employee"}</span>
-            </li>
-          ))}
         </ul>
         <input
           type="hidden"

@@ -13,12 +13,13 @@ import { requireUser } from "@/lib/auth/dal";
 import { toRule } from "@/lib/admin/data";
 import { computeAutoOrder, parseOrder, parseQty } from "@/lib/order";
 import { resolveQuantity } from "@/lib/quantity";
+import { formatSlack, mergeDay } from "@/lib/combined";
 import { dateOnly, laDateString } from "@/lib/time";
 
 export type SubmitState = {
   error?: string;
-  /** Present after a successful submit. */
-  submitted?: { at: string; counted: number };
+  /** Present after a successful submit. `slack` covers just this submission. */
+  submitted?: { at: string; counted: number; slack: string };
 };
 
 const addedSchema = z.object({
@@ -63,7 +64,7 @@ export async function submitInventory(_prev: SubmitState, fd: FormData): Promise
   // Only active items in active sections at the employee's own cafe.
   const items = await prisma.item.findMany({
     where: { id: { in: input.map((l) => l.itemId) }, active: true, section: { cafeId, active: true } },
-    include: { rules: true },
+    include: { rules: true, section: { select: { id: true, name: true, sortOrder: true } } },
   });
   if (items.length !== input.length) {
     return { error: "Some items changed since you started. Refresh the page and try again." };
@@ -126,5 +127,13 @@ export async function submitInventory(_prev: SubmitState, fd: FormData): Promise
   ]);
 
   refresh();
-  return { submitted: { at: submission.submittedAt.toISOString(), counted: lines.length } };
+  // Slack text for only what was just submitted (items with something to order).
+  const slack = formatSlack(
+    today,
+    mergeDay(
+      [{ submittedAt: submission.submittedAt, submittedBy: session.user.fullName, lines: lines.map((l) => ({ itemId: l.itemId, finalOrder: l.finalOrder })) }],
+      new Map(items.map((i) => [i.id, { name: i.name, unit: i.unit, sortOrder: i.sortOrder, section: i.section }])),
+    ),
+  );
+  return { submitted: { at: submission.submittedAt.toISOString(), counted: lines.length, slack } };
 }
