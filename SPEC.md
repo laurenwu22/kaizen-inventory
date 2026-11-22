@@ -104,6 +104,7 @@ MILK
 
 * Create, edit, reorder, and delete sections. Deleting a section permanently removes it with its items and their quantity rules; a section with items that have already been counted can't be deleted.  
 * Set **days of the week needed** (any combination) and **additional one-time dates**.
+* **Duplicate a section** when creating one: pick a section from this cafe or any other cafe the person belongs to (managers: any cafe). It fills in the name, color and days, and copies the active items with their units, order, and default and weekday min/max. One-time dates aren't copied.
 
 **Items**
 

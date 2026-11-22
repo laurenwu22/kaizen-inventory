@@ -22,10 +22,13 @@ export function SectionForm({
   action,
   defaults,
   submitLabel,
+  children,
 }: {
   action: Action;
   defaults?: { name: string; color: string; days: number[] };
   submitLabel: string;
+  /** Extra fields rendered above the submit button (e.g. what's being duplicated). */
+  children?: React.ReactNode;
 }) {
   const [state, formAction] = useActionState(action, {});
   return (
@@ -54,6 +57,8 @@ export function SectionForm({
         <DayPicker defaultValue={defaults?.days} />
         <FieldError state={state} name="days" />
       </div>
+      {children}
+      <FieldError state={state} name="copyFrom" />
       <FormError state={state} />
       <div className="flex items-center gap-3">
         <SubmitButton>{submitLabel}</SubmitButton>

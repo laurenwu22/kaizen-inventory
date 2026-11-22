@@ -42,10 +42,37 @@ function reorder(ids: string[], id: string, direction: "up" | "down"): string[] 
 
 // ---------------------------------------------------------------- Sections
 
+/**
+ * Creates a section. With `copyFrom`, also copies that section's active items
+ * (name, unit, order) and their default and weekday min/max. The source can be
+ * at any cafe the user belongs to (managers: any cafe). One-time dates aren't
+ * copied since they're tied to one cafe's calendar.
+ */
 export async function createSection(_prev: FormState, fd: FormData): Promise<FormState> {
-  const { current } = await requireAdmin();
+  const { current, memberships } = await requireAdmin();
   const parsed = parseForm(sectionSchema, { name: str(fd, "name"), color: str(fd, "color"), days: days(fd) });
   if (!parsed.data) return parsed.state;
+
+  let items: Prisma.ItemCreateWithoutSectionInput[] = [];
+  const copyFrom = str(fd, "copyFrom");
+  if (copyFrom) {
+    const source = await prisma.section.findFirst({
+      where: { id: copyFrom, cafeId: { in: memberships.map((m) => m.cafeId) } },
+      include: {
+        items: {
+          where: { active: true },
+          include: { rules: { where: { type: { in: [RuleType.DEFAULT, RuleType.WEEKDAY] } } } },
+        },
+      },
+    });
+    if (!source) return { fieldErrors: { copyFrom: "That section isn't available anymore. Pick another." } };
+    items = source.items.sort(byPosition).map((item, sortOrder) => ({
+      name: item.name,
+      unit: item.unit,
+      sortOrder,
+      rules: { create: item.rules.map((r) => ({ type: r.type, weekday: r.weekday, min: r.min, max: r.max })) },
+    }));
+  }
 
   let id: string;
   try {
@@ -57,6 +84,7 @@ export async function createSection(_prev: FormState, fd: FormData): Promise<For
         color: parsed.data.color,
         daysOfWeek: parsed.data.days,
         sortOrder: (last._max.sortOrder ?? -1) + 1,
+        items: { create: items },
       },
     });
     id = section.id;

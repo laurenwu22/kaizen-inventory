@@ -334,6 +334,57 @@ describe("admin at cafe A", () => {
   });
 });
 
+describe("duplicating a section", () => {
+  it("copies items, units, order and default/weekday amounts from another cafe the user belongs to", async () => {
+    // adminA also works at B (as an employee).
+    await prisma.userCafe.create({ data: { userId: ids.adminA, cafeId: ids.cafeB, role: Role.EMPLOYEE } });
+    const extra = await prisma.item.create({
+      data: {
+        sectionId: ids.sectionB,
+        name: "A first item",
+        unit: "bags",
+        sortOrder: -1,
+        rules: {
+          create: [
+            { type: RuleType.DEFAULT, min: 2, max: 4 },
+            { type: RuleType.WEEKDAY, weekday: 6, min: 5, max: 8 },
+            { type: RuleType.DATE, date: new Date("2026-12-24"), min: 9, max: 9 },
+          ],
+        },
+      },
+    });
+    await prisma.item.create({ data: { sectionId: ids.sectionB, name: "Gone", unit: "x", active: false } });
+    await as(ids.adminA, ids.cafeA);
+    const r = await run(() =>
+      actions.createSection({}, fd({ name: "B stuff", color: "#4f7896", days: ["2"], copyFrom: ids.sectionB })),
+    );
+    expect(r.redirect).toMatch(/^\/admin\/sections\//);
+    const copy = await prisma.section.findFirstOrThrow({
+      where: { cafeId: ids.cafeA, name: "B stuff" },
+      include: { items: { include: { rules: true }, orderBy: { sortOrder: "asc" } } },
+    });
+    expect(copy.daysOfWeek).toEqual([2]);
+    expect(copy.items.map((i) => [i.name, i.unit, i.sortOrder])).toEqual([
+      ["A first item", "bags", 0],
+      ["B item", "box", 1],
+    ]);
+    const rules = copy.items[0].rules.map((x) => [x.type, x.weekday, Number(x.min), Number(x.max)]).sort();
+    expect(rules).toEqual([["DEFAULT", null, 2, 4], ["WEEKDAY", 6, 5, 8]]);
+    // The original is untouched.
+    expect(await prisma.item.count({ where: { sectionId: ids.sectionB } })).toBe(3);
+    await prisma.quantityRule.deleteMany({ where: { itemId: extra.id } });
+    await prisma.item.deleteMany({ where: { sectionId: ids.sectionB, id: { not: ids.itemB } } });
+    await prisma.userCafe.delete({ where: { userId_cafeId: { userId: ids.adminA, cafeId: ids.cafeB } } });
+  });
+
+  it("refuses a section from a cafe the user doesn't belong to", async () => {
+    await as(ids.adminA, ids.cafeA);
+    const r = await run(() => actions.createSection({}, fd({ name: "Stolen", color: "#4f7896", copyFrom: ids.sectionB })));
+    expect(r.result?.fieldErrors?.copyFrom).toBeTruthy();
+    expect(await prisma.section.findFirst({ where: { cafeId: ids.cafeA, name: "Stolen" } })).toBeNull();
+  });
+});
+
 describe("non-admins", () => {
   it("an employee is refused every admin action", async () => {
     await as(ids.employeeA, ids.cafeA);
