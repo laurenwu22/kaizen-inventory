@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { isAdmin, isManager, type ActiveSession } from "@/lib/auth/dal";
 import { AppMenu, type MenuItem } from "./app-menu";
 import { CafeSwitcher } from "./cafe-switcher";
@@ -18,16 +19,18 @@ export function AppHeader({ session }: { session: ActiveSession }) {
     <HeaderFrame>
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <Image src="/logo.png" alt="Kaizen & Coffee" width={44} height={45} className="shrink-0" priority />
+          {/* The logo goes home (today's count) from any page. */}
+          <Link href="/inventory" aria-label="Home" className="shrink-0 rounded-full hover:opacity-80">
+            <Image src="/logo.png" alt="Kaizen & Coffee" width={44} height={45} priority />
+          </Link>
           <div className="min-w-0">
-            <p className="text-lg font-bold leading-tight">Welcome back, {session.user.firstName}</p>
             {session.memberships.length > 1 ? (
               <CafeSwitcher
                 current={session.current.cafeId}
                 cafes={session.memberships.map((m) => ({ id: m.cafeId, name: m.cafeName }))}
               />
             ) : (
-              <p className="text-ink/70">{session.current.cafeName}</p>
+              <p className="font-semibold">{session.current.cafeName}</p>
             )}
           </div>
         </div>
@@ -44,10 +47,7 @@ export function AppHeaderSkeleton() {
     <HeaderFrame>
       <div className="flex items-center gap-3">
         <Image src="/logo.png" alt="Kaizen & Coffee" width={44} height={45} className="shrink-0" priority />
-        <div className="flex flex-col gap-2">
-          <span className="h-5 w-48 animate-pulse rounded-full bg-ink/10" />
-          <span className="h-4 w-32 animate-pulse rounded-full bg-ink/10" />
-        </div>
+        <span className="h-9 w-40 animate-pulse rounded-full bg-ink/10" />
       </div>
     </HeaderFrame>
   );

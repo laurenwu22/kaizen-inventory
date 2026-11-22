@@ -52,7 +52,8 @@ async function InventoryHome() {
   return (
     <section className="mx-auto w-full max-w-3xl px-4 pt-5 pb-16">
       <div className="mb-5">
-        <h1 className="text-2xl font-bold tracking-tight">{formatYmd(today)}</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Welcome back, {session.user.firstName}</h1>
+        <p className="font-semibold">{formatYmd(today)}</p>
         <p className="text-sm text-ink/60">
           {last
             ? `Inventory last updated ${formatLaDateTime(last.submittedAt)} by ${last.user.firstName}`
