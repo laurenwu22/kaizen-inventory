@@ -4,13 +4,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LinkSpinner } from "./spinner";
 
-/** Inventory | Admin tabs (admins only). Highlights the current area. */
+/**
+ * Inventory | Admin tabs (admins only). Highlights the current area; on menu
+ * pages (order history, today's order, Create PDF, Backup) neither is selected.
+ */
 export function HeaderTabs() {
   const pathname = usePathname();
   const inAdmin = pathname.startsWith("/admin");
+  const inInventory = pathname.startsWith("/inventory");
   return (
     <nav className="flex gap-2">
-      <Tab href="/inventory" selected={!inAdmin}>
+      <Tab href="/inventory" selected={inInventory}>
         Inventory
       </Tab>
       <Tab href="/admin" selected={inAdmin}>
