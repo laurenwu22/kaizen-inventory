@@ -115,7 +115,6 @@ MILK
 **Cafes (managers)**
 
 * Create a cafe: name it and pick people from the other cafes to add, with Employee or Admin at the new cafe. It appears in everyone's cafe switcher right away and starts with no sections.
-* Delete a cafe: permanently removes it with its sections, items, rules and past submissions (its order history), after a confirmation that lists what will be lost and who works only there. People keep their accounts. The last remaining cafe can't be deleted.
 
 **CSV import and export**
 

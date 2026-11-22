@@ -3,10 +3,10 @@ import { requireManager } from "@/lib/auth/dal";
 import { prisma } from "@/lib/db";
 import { compareNames } from "@/lib/quantity";
 import { PageTitle } from "@/components/admin/admin-chrome";
-import { DeleteCafeModal, NewCafeModal } from "@/components/admin/cafe-editor";
+import { NewCafeModal } from "@/components/admin/cafe-editor";
 import { ContentSpinner } from "@/components/spinner";
 import { ui } from "@/components/ui";
-import { createCafe, deleteCafe } from "./actions";
+import { createCafe } from "./actions";
 
 // Admin > Cafes (managers only).
 
@@ -14,10 +14,7 @@ async function CafesAdmin() {
   await requireManager();
   const [cafes, people] = await Promise.all([
     prisma.cafe.findMany({
-      include: {
-        _count: { select: { members: true, sections: true, submissions: true } },
-        members: { select: { userId: true } },
-      },
+      include: { _count: { select: { members: true, sections: { where: { active: true } } } } },
     }),
     prisma.user.findMany({
       where: { active: true },
@@ -53,28 +50,12 @@ async function CafesAdmin() {
       </PageTitle>
       <ul className={`${ui.card} divide-y divide-ink/10`}>
         {cafes.map((c) => (
-          <li key={c.id} className="flex items-center gap-3 px-4 py-3">
-            <span className="min-w-0 flex-1">
-              <span className="block font-semibold">{c.name}</span>
-              <span className="block text-sm text-ink/55">
-                {c._count.members} {c._count.members === 1 ? "person" : "people"} · {c._count.sections}{" "}
-                {c._count.sections === 1 ? "section" : "sections"}
-              </span>
+          <li key={c.id} className="flex items-center justify-between gap-3 px-4 py-3">
+            <span className="font-semibold">{c.name}</span>
+            <span className="text-sm text-ink/55">
+              {c._count.members} {c._count.members === 1 ? "person" : "people"} · {c._count.sections}{" "}
+              {c._count.sections === 1 ? "section" : "sections"}
             </span>
-            {cafes.length > 1 && (
-              <DeleteCafeModal
-                action={deleteCafe.bind(null, c.id)}
-                cafe={{
-                  name: c.name,
-                  people: c._count.members,
-                  sections: c._count.sections,
-                  submissions: c._count.submissions,
-                  onlyCafeFor: people
-                    .filter((p) => !p.isManager && p.cafes.length === 1 && p.cafes[0].cafeId === c.id)
-                    .map((p) => `${p.firstName} ${p.lastName}`),
-                }}
-              />
-            )}
           </li>
         ))}
       </ul>

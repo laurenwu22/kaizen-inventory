@@ -5,9 +5,8 @@
 // - Calendar dates (business dates, extra section dates, date rules) are
 //   America/Los_Angeles dates stored as Postgres DATE with no time zone.
 // - Weekdays are 0-6, Sunday = 0 (matches JS Date#getDay).
-// - Users are deactivated via `active`, never deleted. Sections and items can
-//   be deleted only if never counted. Deleting a whole cafe (managers only)
-//   removes everything in it, its history included.
+// - Nothing that carries history is ever deleted: users, sections and items
+//   are deactivated via `active`.
 //
 // Some integrity rules can't be expressed in Prisma schema language and live
 // in hand-written SQL in the migrations (CHECK constraints, NULLS NOT DISTINCT).
