@@ -5,9 +5,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LinkSpinner } from "@/components/spinner";
 
-type Tab = "sections" | "employees" | "cafes" | "backup" | null;
+type Tab = "sections" | "employees" | "cafes" | null;
 
-/** Sections | Employees | Cafes | Backup & transfer sub-tabs inside Admin (all but Sections for managers). */
+/** Sections | Employees | Cafes sub-tabs inside Admin (the last two for managers). */
 export function AdminTabs({ manager }: { manager: boolean }) {
   // The URL is request-time data on dynamic pages, so read it inside Suspense;
   // the fallback draws the same tabs without a highlight for that instant.
@@ -24,15 +24,13 @@ function CurrentTabs({ manager }: { manager: boolean }) {
     ? "employees"
     : pathname.startsWith("/admin/cafes")
       ? "cafes"
-      : pathname.startsWith("/admin/backup")
-        ? "backup"
-        : "sections";
+      : "sections";
   return <TabsView tab={tab} manager={manager} />;
 }
 
 function TabsView({ tab, manager }: { tab: Tab; manager: boolean }) {
   return (
-    <nav className="flex gap-5 overflow-x-auto border-b border-ink/10 whitespace-nowrap sm:gap-6" aria-label="Admin">
+    <nav className="flex gap-6 border-b border-ink/10" aria-label="Admin">
       <SubTab href="/admin" selected={tab === "sections"}>
         Sections
       </SubTab>
@@ -43,10 +41,6 @@ function TabsView({ tab, manager }: { tab: Tab; manager: boolean }) {
           </SubTab>
           <SubTab href="/admin/cafes" selected={tab === "cafes"}>
             Cafes
-          </SubTab>
-          <SubTab href="/admin/backup" selected={tab === "backup"}>
-            <span className="sm:hidden">Backup</span>
-            <span className="hidden sm:inline">Backup &amp; transfer</span>
           </SubTab>
         </>
       )}

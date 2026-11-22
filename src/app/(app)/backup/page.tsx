@@ -3,12 +3,11 @@ import { requireManager } from "@/lib/auth/dal";
 import { prisma } from "@/lib/db";
 import { compareNames } from "@/lib/quantity";
 import { laDateString } from "@/lib/time";
-import { PageTitle } from "@/components/admin/admin-chrome";
 import { ExportPanel } from "@/components/admin/backup/export-panel";
 import { ImportPanel } from "@/components/admin/backup/import-panel";
 import { ContentSpinner } from "@/components/spinner";
 
-// Admin > Backup & transfer (managers only): export everything (or a chosen
+// Backup & transfer (managers only, from the menu): export everything (or a chosen
 // part) to a file, and import a file here or into a new copy of the site.
 
 async function Backup() {
@@ -17,20 +16,20 @@ async function Backup() {
     compareNames(a.name, b.name),
   );
   return (
-    <>
-      <PageTitle>Backup &amp; transfer</PageTitle>
-      <div className="flex flex-col gap-5">
-        <ExportPanel cafes={cafes} today={laDateString()} />
-        <ImportPanel />
-      </div>
-    </>
+    <div className="flex flex-col gap-5">
+      <ExportPanel cafes={cafes} today={laDateString()} />
+      <ImportPanel />
+    </div>
   );
 }
 
 export default function BackupPage() {
   return (
-    <Suspense fallback={<ContentSpinner />}>
-      <Backup />
-    </Suspense>
+    <section className="mx-auto w-full max-w-3xl px-4 pt-5 pb-16">
+      <h1 className="mb-5 text-2xl font-bold tracking-tight">Backup &amp; transfer</h1>
+      <Suspense fallback={<ContentSpinner />}>
+        <Backup />
+      </Suspense>
+    </section>
   );
 }

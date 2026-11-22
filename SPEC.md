@@ -37,7 +37,7 @@
 * Greeting: *Welcome back, \[first name\]*  
 * Current cafe, with a dropdown switcher if the user has more than one  
 * *Inventory last updated \[date/time\] by \[name\]* for the selected cafe, derived from the most recent submission  
-* Hamburger menu at top: **Create PDF** and **View today's combined order**
+* Hamburger menu at top: **View today's combined order**, **View order history**, **Create PDF**, and for managers **Backup & transfer**
 * **Create PDF** opens a printable count sheet for the selected cafe, a paper backup for counting by hand if the app is down. Options (not printed): the date (default today; future dates let staff print ahead) and Scheduled that day or All sections. "Print / Save as PDF" opens the browser's print dialog.
   * The sheet: cafe, date, a blank for Counted by, then one table per section in admin order with Item, Unit, Min, Max (that day's amounts), and blank Count, Plenty checkbox and To order columns. The order rule is printed at the bottom. US Letter, sections kept whole on a page, page numbers. Always blank: submitted counts are never printed.
 
@@ -119,7 +119,7 @@ MILK
 
 * Create a cafe: name it and pick people from the other cafes to add, with Employee or Admin at the new cafe. It appears in everyone's cafe switcher right away and starts with no sections.
 
-**Backup & transfer (managers)**
+**Backup & transfer (managers, in the hamburger menu)**
 
 * Lets the whole site move to a new database or new accounts with nothing lost, and serves as a backup.
 * **Export:** choose cafes and what to include: People and roles (names, PINs, managers, roles), Sections and items (days, one-time dates, items, units, every min/max), Order history (submissions, counts, Plenty, manual edits, "Added by"), with an optional history date range. History always brings the people and sections it refers to. Downloads one JSON file (format version 1) that keeps original ids and timestamps. Every manager is included in a People export. The file contains PINs and must be kept private.
@@ -276,6 +276,6 @@ Landing Page:
 6. Admin: employee management  
 7. Order history page: calendar view and item search  
 8. Print today's sheet  
-9. Admin: Backup & transfer (export and import)  
+9. Backup & transfer (export and import)  
 10. Mobile polish and real-world testing at the cafe
 

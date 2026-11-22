@@ -10,7 +10,7 @@ import {
   importBaseAction,
   importSubmissionsAction,
   previewImportAction,
-} from "@/app/(app)/admin/backup/actions";
+} from "@/app/(app)/backup/actions";
 import { Spinner } from "@/components/spinner";
 import { ui } from "@/components/ui";
 import {

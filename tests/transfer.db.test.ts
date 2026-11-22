@@ -29,7 +29,7 @@ vi.mock("next/cache", () => ({ refresh: () => {}, revalidatePath: () => {} }));
 
 const { prisma } = await import("@/lib/db");
 const { signSession } = await import("@/lib/auth/token");
-const actions = await import("@/app/(app)/admin/backup/actions");
+const actions = await import("@/app/(app)/backup/actions");
 const fmt = await import("@/lib/transfer/format");
 
 const tag = `test-xfer-${Date.now()}`;

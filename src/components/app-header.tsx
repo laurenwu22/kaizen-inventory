@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { isAdmin, type ActiveSession } from "@/lib/auth/dal";
+import { isAdmin, isManager, type ActiveSession } from "@/lib/auth/dal";
 import { AppMenu, type MenuItem } from "./app-menu";
 import { CafeSwitcher } from "./cafe-switcher";
 import { HeaderTabs } from "./header-tabs";
@@ -10,6 +10,7 @@ const MENU_ITEMS: MenuItem[] = [
   { label: "View order history", href: "/history" },
   { label: "Create PDF", href: "/print" },
 ];
+const MANAGER_ITEMS: MenuItem[] = [{ label: "Backup & transfer", href: "/backup" }];
 
 /** Shared header for signed-in pages. Rendered once by the (app) layout. */
 export function AppHeader({ session }: { session: ActiveSession }) {
@@ -30,7 +31,7 @@ export function AppHeader({ session }: { session: ActiveSession }) {
             )}
           </div>
         </div>
-        <AppMenu userName={session.user.fullName} cafeName={session.current.cafeName} items={MENU_ITEMS} />
+        <AppMenu userName={session.user.fullName} cafeName={session.current.cafeName} items={isManager(session) ? [...MENU_ITEMS, ...MANAGER_ITEMS] : MENU_ITEMS} />
       </div>
       {isAdmin(session) && <HeaderTabs />}
     </HeaderFrame>

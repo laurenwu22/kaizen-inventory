@@ -4,7 +4,7 @@
 // Built in steps (base data, then history page by page) so no single response
 // is too large.
 import { useState } from "react";
-import { exportBaseAction, exportHistoryAction } from "@/app/(app)/admin/backup/actions";
+import { exportBaseAction, exportHistoryAction } from "@/app/(app)/backup/actions";
 import { DateField } from "@/components/admin/date-field";
 import { Spinner } from "@/components/spinner";
 import { ui } from "@/components/ui";
