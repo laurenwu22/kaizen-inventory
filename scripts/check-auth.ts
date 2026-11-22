@@ -71,6 +71,8 @@ async function main() {
     // Signed out
     let r = await visit("/inventory");
     check("signed out: /inventory -> /", r.redirectTo === "/", `got ${r.status} ${r.redirectTo}`);
+    r = await visit("/print");
+    check("signed out: /print -> /", r.redirectTo === "/", `got ${r.status} ${r.redirectTo}`);
     r = await visit("/admin");
     check("signed out: /admin -> /", r.redirectTo === "/", `got ${r.status} ${r.redirectTo}`);
     r = await visit("/");
@@ -87,6 +89,8 @@ async function main() {
     r = await visit("/inventory", good);
     check("employee: /inventory renders", r.status === 200 && !r.redirectTo && r.body.includes("Welcome back"), `got ${r.status} ${r.redirectTo}`);
     check("employee: no Admin tab", !r.body.includes('href="/admin"'));
+    r = await visit("/print", good);
+    check("employee: /print renders the count sheet", r.status === 200 && !r.redirectTo && r.body.includes("Counted by"), `got ${r.status} ${r.redirectTo}`);
     r = await visit("/admin", good);
     check("employee: /admin refused -> /inventory", r.redirectTo === "/inventory" && !r.body.includes("+ Add section"), `got ${r.status} ${r.redirectTo}`);
     r = await visit("/", good);

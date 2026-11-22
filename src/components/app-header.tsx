@@ -8,7 +8,7 @@ import { HeaderTabs } from "./header-tabs";
 const MENU_ITEMS: MenuItem[] = [
   { label: "View today's combined order", href: "/order" },
   { label: "View order history", href: "/history" },
-  { label: "Create PDF" }, // build step 7
+  { label: "Create PDF", href: "/print" },
 ];
 
 /** Shared header for signed-in pages. Rendered once by the (app) layout. */
@@ -54,7 +54,7 @@ export function AppHeaderSkeleton() {
 
 function HeaderFrame({ children }: { children: React.ReactNode }) {
   return (
-    <header className="border-b border-ink/10 bg-sand pt-[env(safe-area-inset-top)]">
+    <header className="border-b border-ink/10 bg-sand pt-[env(safe-area-inset-top)] print:hidden">
       <div className="mx-auto flex max-w-3xl flex-col gap-3 px-4 py-4">{children}</div>
     </header>
   );

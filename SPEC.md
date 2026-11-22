@@ -38,6 +38,8 @@
 * Current cafe, with a dropdown switcher if the user has more than one  
 * *Inventory last updated \[date/time\] by \[name\]* for the selected cafe, derived from the most recent submission  
 * Hamburger menu at top: **Create PDF** and **View today's combined order**
+* **Create PDF** opens a printable count sheet for the selected cafe, a paper backup for counting by hand if the app is down. Options (not printed): the date (default today; future dates let staff print ahead) and Scheduled that day or All sections. "Print / Save as PDF" opens the browser's print dialog.
+  * The sheet: cafe, date, blanks for Counted by and Time, then one table per section in admin order with Item, Unit, Min, Max (that day's amounts), and blank Count, Plenty checkbox and To order columns. The order rule is printed at the bottom. US Letter, sections kept whole on a page, page numbers. Always blank: submitted counts are never printed.
 
 **Sections**
 

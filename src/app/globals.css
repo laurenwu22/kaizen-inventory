@@ -54,3 +54,27 @@ body {
     cursor: not-allowed;
   }
 }
+
+/* Create PDF: US Letter, white paper, sections kept whole, page numbers. */
+@media print {
+  @page {
+    size: letter;
+    margin: 0.5in 0.5in 0.6in;
+    @bottom-right {
+      content: "Page " counter(page) " of " counter(pages);
+      font-family: var(--font-sans);
+      font-size: 9pt;
+    }
+  }
+  body {
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print-section {
+    break-inside: avoid;
+  }
+  .print-sheet tr {
+    break-inside: avoid;
+  }
+}
