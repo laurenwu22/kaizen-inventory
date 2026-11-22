@@ -39,7 +39,7 @@
 * *Inventory last updated \[date/time\] by \[name\]* for the selected cafe, derived from the most recent submission  
 * Hamburger menu at top: **Create PDF** and **View today's combined order**
 * **Create PDF** opens a printable count sheet for the selected cafe, a paper backup for counting by hand if the app is down. Options (not printed): the date (default today; future dates let staff print ahead) and Scheduled that day or All sections. "Print / Save as PDF" opens the browser's print dialog.
-  * The sheet: cafe, date, blanks for Counted by and Time, then one table per section in admin order with Item, Unit, Min, Max (that day's amounts), and blank Count, Plenty checkbox and To order columns. The order rule is printed at the bottom. US Letter, sections kept whole on a page, page numbers. Always blank: submitted counts are never printed.
+  * The sheet: cafe, date, a blank for Counted by, then one table per section in admin order with Item, Unit, Min, Max (that day's amounts), and blank Count, Plenty checkbox and To order columns. The order rule is printed at the bottom. US Letter, sections kept whole on a page, page numbers. Always blank: submitted counts are never printed.
 
 **Sections**
 
@@ -119,12 +119,14 @@ MILK
 
 * Create a cafe: name it and pick people from the other cafes to add, with Employee or Admin at the new cafe. It appears in everyone's cafe switcher right away and starts with no sections.
 
-**CSV import and export**
+**Backup & transfer (managers)**
 
-* Export one section or all sections for a cafe. Import a CSV into any cafe, which supports sharing item lists across cafes.  
-* Import is previewed before it is committed, with row-level errors shown.  
-* Matching: an imported item whose section name and item name match an existing item at that cafe **updates** it. Otherwise it is created.  
-* Suggested columns: `section, item, unit, default_min, default_max, mon_min, mon_max, tue_min, tue_max, wed_min, wed_max, thu_min, thu_max, fri_min, fri_max, sat_min, sat_max, sun_min, sun_max, section_days`. Weekday columns are optional. One-time date rules are not part of the CSV.
+* Lets the whole site move to a new database or new accounts with nothing lost, and serves as a backup.
+* **Export:** choose cafes and what to include: People and roles (names, PINs, managers, roles), Sections and items (days, one-time dates, items, units, every min/max), Order history (submissions, counts, Plenty, manual edits, "Added by"), with an optional history date range. History always brings the people and sections it refers to. Downloads one JSON file (format version 1) that keeps original ids and timestamps. Every manager is included in a People export. The file contains PINs and must be kept private.
+* **Import:** choose a file, then cafes, parts, and what to do with records already here: **Keep what's here** (only add what's missing) or **Update to match the file** (overwrite matching people, sections, items and amounts). A preview shows exactly what will change before anything is saved.
+* Matching: cafes by id or name; people by id, or the same PIN and the same name (a PIN that belongs to a different person here is a problem and that person and their history are skipped); sections and items by id or by name within their cafe or section; submissions by id, never doubled. Importing the same file twice changes nothing, and an interrupted import can simply be run again.
+* Data moves in small batches, so large histories aren't limited by request size. Sign-in attempt logs and sessions are not included; everyone signs in again after a move.
+* Moving to new accounts: export everything, deploy the app on the new accounts (new database, new session secret, run the seed to create the first manager), sign in, import everything.
 
 ## **Quantity Rules**
 
@@ -274,6 +276,6 @@ Landing Page:
 6. Admin: employee management  
 7. Order history page: calendar view and item search  
 8. Print today's sheet  
-9. Admin: CSV import and export  
+9. Admin: Backup & transfer (export and import)  
 10. Mobile polish and real-world testing at the cafe
 
